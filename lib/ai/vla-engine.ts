@@ -10,7 +10,7 @@ export type DashcamPerspective = "insured" | "witness" | "adverse";
  * meaningful way. Stored in evidence_analysis rows so you can diff model
  * behavior across prompt versions in regression testing.
  */
-export const PROMPT_VERSION = "v4";
+export const PROMPT_VERSION = "v5";
 
 const PERSPECTIVE_INSTRUCTIONS: Record<"insured" | "witness" | "adverse", string> = {
   insured:
@@ -71,6 +71,8 @@ export const USER_PROMPT = `Analyze the attached evidence and respond with a sin
   "timeline": [
     {
       "timestamp_seconds": number,
+      "frame_index": number,
+      "evidence_span": { "start_seconds": number, "end_seconds": number },
       "action": string,
       "suggested_liability_percent": number,
       "adjuster_observation": string,
@@ -87,6 +89,9 @@ export const USER_PROMPT = `Analyze the attached evidence and respond with a sin
 Field rules:
 - material_facts: answer from the evidence only. "another_vehicle_present" = yes if another moving road user’s vehicle is clearly visible such that it could interact with the insured in this clip (not merely distant parked cars). "conflict_or_contact" = yes if you see contact, a collision, a clearly imminent crash, or the insured braking/steering hard because another road user has entered their path. If lighting, angle, or frame gaps prevent a firm answer, use "uncertain" for that field — never guess "no" when you cannot see the relevant moment.
 - timeline: chronological order. "action" = short neutral label describing what occurred (e.g. "insured follows too close", "third-party lane change"). Always identify which vehicle is acting — insured or third party.
+- timestamp_seconds: approximate time in the source recording (seconds from clip start) for the key moment of this event — align with evidence_span when both are present.
+- frame_index: REQUIRED when you received multiple sequential frames from a video. Integer ≥1 where Frame 1 is the earliest image shown; pick the single frame that best shows this event. Omit the key entirely for a single still photograph (not a frame sequence).
+- evidence_span: REQUIRED when analyzing video. {start_seconds, end_seconds} = wall-clock interval in the source clip where this event is visible or inferable (end_seconds may equal start_seconds; end_seconds must be ≥ start_seconds). Omit the key entirely for a single still photograph.
 - suggested_liability_percent (per event): 0–100 fault attributable TO THE INSURED VEHICLE at that moment. Use 0 unless the insured committed a specific, observable traffic violation or driving error at that moment. Do NOT assign partial fault based on "could have reacted sooner," "might have been going slightly fast," or other hypothetical alternatives — only score what you can directly observe. If a third party commits a violation that does not implicate the insured, score 0.
 - adjuster_observation: 1–3 sentences, professional file-note tone. Explicitly name which vehicle is acting and what it did. Note uncertainty if lighting/angle limits certainty.
 - violation_tags: tags for violations committed BY THE INSURED VEHICLE only — not third parties. Use only: ["speeding", "lane_change", "failure_to_yield", "improper_turn", "following_too_close", "running_red_light", "running_stop_sign", "distracted_driving", "reckless_driving"]. Empty array if the insured committed no violation in this event.

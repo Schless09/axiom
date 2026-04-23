@@ -26,6 +26,22 @@ export const materialFactTernary = z.enum(["yes", "no", "uncertain"]);
  * Minimal structured facts every model must output so we can detect incompatible
  * interpretations of the same pixels (e.g. one model sees a left-hook, another sees routine driving).
  */
+/**
+ * Wall-clock span in the source media where the observation is grounded.
+ * `end_seconds` may equal `start_seconds` for a point event.
+ */
+export const vlaEvidenceSpanSchema = z
+  .object({
+    start_seconds: z.number().nonnegative(),
+    end_seconds: z.number().nonnegative(),
+  })
+  .transform((s) => ({
+    start_seconds: s.start_seconds,
+    end_seconds: Math.max(s.start_seconds, s.end_seconds),
+  }));
+
+export type VlaEvidenceSpan = z.infer<typeof vlaEvidenceSpanSchema>;
+
 export const materialFactsSchema = z.object({
   /**
    * Another road user's vehicle is clearly visible in motion (not just distant parked cars),
@@ -39,8 +55,19 @@ export const materialFactsSchema = z.object({
   conflict_or_contact: materialFactTernary,
 });
 
+function nullToUndef<T>(v: T | null | undefined): T | undefined {
+  return v === null ? undefined : v;
+}
+
 export const vlaTimelineEventSchema = z.object({
   timestamp_seconds: z.number().nonnegative(),
+  /**
+   * When evidence is sequential frames (video → JPEGs), 1-based index of the frame that
+   * best supports this event (Frame 1 = earliest). Omit for single-image evidence if N/A.
+   */
+  frame_index: z.preprocess(nullToUndef, z.number().int().positive().optional()),
+  /** Continuous time range in the source clip where this observation is visible / grounded. */
+  evidence_span: z.preprocess(nullToUndef, vlaEvidenceSpanSchema.optional()),
   /** Short label for matching (e.g. "improper lane change", "failure to yield"). */
   action: z.string().min(1),
   suggested_liability_percent: z.number().min(0).max(100),

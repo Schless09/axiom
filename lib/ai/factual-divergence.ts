@@ -9,6 +9,12 @@ export type FactualDivergenceAssessment = {
 
 const MATERIAL_FIELDS = ["another_vehicle_present", "conflict_or_contact"] as const;
 
+/** Must stay in sync with `TIMESTAMP_TOLERANCE_S` in `consensus.ts` (merge / match window). */
+const TIMELINE_MATCH_WINDOW_S = 2;
+
+/** Same primary preference as `buildConsensus` — anchor timeline comparison on this model when present. */
+const PRIMARY_ORDER: ModelProvider[] = ["gemini", "anthropic", "openai"];
+
 function analysisTextBlob(a: VlaAnalysis): string {
   return [
     a.narrative_summary,
@@ -36,27 +42,76 @@ function narrativeIncidentSignal(text: string): "conflict" | "none_reported" | "
   return "unclear";
 }
 
-function materialFactsConflict(
+/**
+ * Any mismatch on yes / no / uncertain across models is material — e.g. two models say
+ * "no contact" while a third says "uncertain" must surface as divergence (previously
+ * only yes-vs-no was detected and "uncertain" was ignored).
+ */
+function materialFactsStrictMismatch(
   entries: Partial<Record<ModelProvider, NonNullable<VlaAnalysis["material_facts"]>>>,
 ): { divergent: boolean; reasons: string[] } {
   const reasons: string[] = [];
   for (const field of MATERIAL_FIELDS) {
-    const values = new Set<string>();
+    const values: string[] = [];
     for (const mf of Object.values(entries)) {
       if (!mf) continue;
       const v = mf[field];
-      if (v === "yes" || v === "no") values.add(v);
+      if (v === "yes" || v === "no" || v === "uncertain") values.push(v);
     }
-    if (values.has("yes") && values.has("no")) {
-      reasons.push(`models split on material_facts.${field} (yes vs no)`);
+    const unique = new Set(values);
+    if (unique.size > 1) {
+      reasons.push(
+        `models disagree on material_facts.${field} (${[...unique].sort().join(", ")})`,
+      );
     }
   }
   return { divergent: reasons.length > 0, reasons };
 }
 
 /**
+ * If the primary timeline’s events don’t line up in time with another model’s timeline,
+ * the models are likely narrating different interpretations of the same clip (even when
+ * liability scores agree at 0 %).
+ */
+function assessTimelineMisalignment(
+  runs: { provider: ModelProvider; analysis: VlaAnalysis }[],
+): { divergent: boolean; reasons: string[] } {
+  if (runs.length < 2) return { divergent: false, reasons: [] };
+
+  const primary =
+    PRIMARY_ORDER.map((p) => runs.find((r) => r.provider === p)).find(Boolean) ?? runs[0];
+  const primaryTl = primary.analysis.timeline ?? [];
+  if (primaryTl.length === 0) return { divergent: false, reasons: [] };
+
+  const reasons: string[] = [];
+  const secondaries = runs.filter((r) => r.provider !== primary.provider);
+
+  for (const sec of secondaries) {
+    const st = sec.analysis.timeline ?? [];
+    if (st.length === 0) continue;
+
+    let matched = 0;
+    for (const ev of primaryTl) {
+      const ts = ev.timestamp_seconds ?? 0;
+      const hasNear = st.some((s) => Math.abs((s.timestamp_seconds ?? 0) - ts) <= TIMELINE_MATCH_WINDOW_S);
+      if (hasNear) matched++;
+    }
+    const rate = matched / primaryTl.length;
+    if (rate < 0.5) {
+      reasons.push(
+        `${primary.provider} timeline does not align with ${sec.provider} ` +
+          `(${matched}/${primaryTl.length} events matched within ${TIMELINE_MATCH_WINDOW_S}s)`,
+      );
+    }
+  }
+
+  return { divergent: reasons.length > 0, reasons };
+}
+
+/**
  * Detect whether successful model runs describe materially incompatible versions of the evidence.
- * Uses structured `material_facts` when present; falls back to narrative/timeline phrase heuristics.
+ * Order: strict `material_facts` agreement (including `uncertain` vs yes/no), structural timeline
+ * alignment vs the primary model, then narrative phrase heuristics.
  */
 export function assessFactualDivergence(
   runs: { provider: ModelProvider; analysis: VlaAnalysis }[],
@@ -72,9 +127,12 @@ export function assessFactualDivergence(
   ) as Partial<Record<ModelProvider, NonNullable<VlaAnalysis["material_facts"]>>>;
 
   if (Object.keys(withFacts).length >= 2) {
-    const { divergent, reasons } = materialFactsConflict(withFacts);
+    const { divergent, reasons } = materialFactsStrictMismatch(withFacts);
     if (divergent) return { divergent, reasons };
   }
+
+  const timelineCheck = assessTimelineMisalignment(runs);
+  if (timelineCheck.divergent) return timelineCheck;
 
   const signals = runs.map((r) => ({
     provider: r.provider,

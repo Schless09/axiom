@@ -1,30 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PasswordInputWithToggle } from "@/components/auth/password-input-with-toggle";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+type SignupNotice =
+  | { kind: "confirm_email"; email: string }
+  | { kind: "ambiguous" };
+
 export function LoginForm() {
   const router = useRouter();
+  const signupBannerRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [signupNotice, setSignupNotice] = useState<SignupNotice | null>(null);
+  const [loadingAction, setLoadingAction] = useState<null | "signin" | "signup">(null);
+
+  useEffect(() => {
+    if (signupNotice && signupBannerRef.current) {
+      signupBannerRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [signupNotice]);
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    setLoadingAction("signin");
     setError(null);
-    setMessage(null);
+    setSignupNotice(null);
     const supabase = createClient();
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
+    setLoadingAction(null);
     if (err) {
       setError(err.message);
       return;
@@ -35,17 +48,26 @@ export function LoginForm() {
 
   async function signUp(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    setLoadingAction("signup");
     setError(null);
-    setMessage(null);
+    setSignupNotice(null);
     const supabase = createClient();
-    const { error: err } = await supabase.auth.signUp({ email, password });
-    setLoading(false);
+    const { data, error: err } = await supabase.auth.signUp({ email, password });
+    setLoadingAction(null);
     if (err) {
       setError(err.message);
       return;
     }
-    setMessage("Account created. You can sign in now.");
+    if (data.session) {
+      router.push("/");
+      router.refresh();
+      return;
+    }
+    if (data.user) {
+      setSignupNotice({ kind: "confirm_email", email });
+      return;
+    }
+    setSignupNotice({ kind: "ambiguous" });
   }
 
   return (
@@ -63,7 +85,10 @@ export function LoginForm() {
               type="email"
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setSignupNotice(null);
+              }}
               required
             />
           </div>
@@ -77,9 +102,8 @@ export function LoginForm() {
                 Forgot password?
               </Link>
             </div>
-            <Input
+            <PasswordInputWithToggle
               id="password"
-              type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -87,14 +111,55 @@ export function LoginForm() {
               minLength={6}
             />
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
+          {error ? (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {signupNotice ? (
+            <div
+              ref={signupBannerRef}
+              role="status"
+              aria-live="polite"
+              className="flex gap-3 rounded-lg border border-primary/25 bg-accent/60 p-4 text-card-foreground shadow-sm"
+            >
+              <CheckCircle2
+                className="mt-0.5 size-5 shrink-0 text-primary"
+                aria-hidden
+              />
+              <div className="min-w-0 space-y-1">
+                <p className="font-semibold leading-tight">
+                  {signupNotice.kind === "confirm_email"
+                    ? "Account created — one more step"
+                    : "Request received"}
+                </p>
+                {signupNotice.kind === "confirm_email" ? (
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    Open the confirmation link we sent to{" "}
+                    <span className="font-medium text-foreground">{signupNotice.email}</span>, then
+                    sign in here.
+                  </p>
+                ) : (
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    If this email can sign up, you may need to confirm it from your inbox before
+                    signing in. If you already have an account, use Sign in instead.
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button type="submit" className="flex-1" disabled={loading}>
-              {loading ? "…" : "Sign in"}
+            <Button type="submit" className="flex-1" disabled={loadingAction !== null}>
+              {loadingAction === "signin" ? "Signing in…" : "Sign in"}
             </Button>
-            <Button type="button" variant="secondary" className="flex-1" disabled={loading} onClick={signUp}>
-              Create account
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              disabled={loadingAction !== null}
+              onClick={signUp}
+            >
+              {loadingAction === "signup" ? "Creating account…" : "Create account"}
             </Button>
           </div>
         </form>

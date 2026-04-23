@@ -12,6 +12,8 @@ import { saveClaimReview, submitClaimReview, type EventOverride } from "@/app/ac
 
 type TimelineEvent = {
   timestamp_seconds?: number;
+  frame_index?: number;
+  evidence_span?: { start_seconds?: number; end_seconds?: number };
   action?: string;
   suggested_liability_percent?: number;
 };

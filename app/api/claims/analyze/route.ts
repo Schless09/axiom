@@ -179,6 +179,8 @@ async function analyzeVlaEvidence(
     raw_by_provider,
     statute_matches: matches.map((m) => ({
       timestamp_seconds: m.event.timestamp_seconds,
+      frame_index: m.event.frame_index,
+      evidence_span: m.event.evidence_span,
       action: m.event.action,
       statute: m.statute
         ? { statute_code: m.statute.statute_code, description: m.statute.description, violation_type: m.statute.violation_type }

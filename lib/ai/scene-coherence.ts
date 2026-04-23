@@ -67,7 +67,14 @@ function summarizeModelOutput(result: ModelResult): string {
 
   const timelineLines = analysis.timeline
     .slice(0, 8)
-    .map((e) => `  t=${e.timestamp_seconds ?? "?"}s: ${e.action}`)
+    .map((e) => {
+      const span =
+        e.evidence_span != null
+          ? ` span=${e.evidence_span.start_seconds}-${e.evidence_span.end_seconds}s`
+          : "";
+      const fi = e.frame_index != null ? ` f=${e.frame_index}` : "";
+      return `  t=${e.timestamp_seconds ?? "?"}s${fi}${span}: ${e.action}`;
+    })
     .join("\n");
 
   const mf = analysis.material_facts;

@@ -6,8 +6,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
+type EvidenceSpan = {
+  start_seconds?: number;
+  end_seconds?: number;
+};
+
 type TimelineEvent = {
   timestamp_seconds?: number;
+  frame_index?: number;
+  evidence_span?: EvidenceSpan;
   action?: string;
   suggested_liability_percent?: number;
   adjuster_observation?: string;
@@ -18,8 +25,36 @@ type TimelineEvent = {
 type StatuteMatch = {
   action?: string;
   timestamp_seconds?: number;
+  frame_index?: number;
+  evidence_span?: EvidenceSpan;
   statute?: { statute_code?: string; description?: string } | null;
 };
+
+function seekSecondsForEvent(row: TimelineEvent): number | undefined {
+  const span = row.evidence_span;
+  if (span && typeof span.start_seconds === "number") return span.start_seconds;
+  if (typeof row.timestamp_seconds === "number") return row.timestamp_seconds;
+  return undefined;
+}
+
+function formatTimelineInstant(row: TimelineEvent): string {
+  const span = row.evidence_span;
+  if (
+    span &&
+    typeof span.start_seconds === "number" &&
+    typeof span.end_seconds === "number" &&
+    span.end_seconds !== span.start_seconds
+  ) {
+    return `${span.start_seconds.toFixed(1)}–${span.end_seconds.toFixed(1)}s`;
+  }
+  if (span && typeof span.start_seconds === "number") {
+    return `${span.start_seconds.toFixed(1)}s`;
+  }
+  if (typeof row.timestamp_seconds === "number") {
+    return `${row.timestamp_seconds.toFixed(1)}s`;
+  }
+  return "—";
+}
 
 type Props = {
   mediaUrl: string | null;
@@ -138,10 +173,11 @@ export function EvidencePlayer({ mediaUrl, fileType, timeline, statuteMatches, s
           <ScrollArea className="h-[280px] rounded-md border p-3 lg:h-[320px]">
             <ul className="space-y-3 text-sm">
               {timeline.map((row, i) => {
-                const isSeekable = fileType === "video" && typeof row.timestamp_seconds === "number";
+                const seekAt = seekSecondsForEvent(row);
+                const isSeekable = fileType === "video" && typeof seekAt === "number";
                 return (
                   <li key={i} className="border-b border-border/60 pb-3 last:border-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {/* Confidence dot */}
                       {row.confidence ? (
                         <span
@@ -156,7 +192,7 @@ export function EvidencePlayer({ mediaUrl, fileType, timeline, statuteMatches, s
                       <button
                         type="button"
                         disabled={!isSeekable}
-                        onClick={() => seekTo(row.timestamp_seconds)}
+                        onClick={() => seekTo(seekAt)}
                         className={cn(
                           "font-mono text-xs text-muted-foreground",
                           isSeekable &&
@@ -164,10 +200,16 @@ export function EvidencePlayer({ mediaUrl, fileType, timeline, statuteMatches, s
                         )}
                         title={isSeekable ? "Click to seek video" : undefined}
                       >
-                        {typeof row.timestamp_seconds === "number"
-                          ? `${row.timestamp_seconds.toFixed(1)}s`
-                          : "—"}
+                        {formatTimelineInstant(row)}
                       </button>
+                      {typeof row.frame_index === "number" ? (
+                        <span
+                          className="rounded border border-border/80 bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                          title="1-based frame index in the analyzed sequence"
+                        >
+                          f{row.frame_index}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="mt-1 font-medium">{row.action ?? "—"}</p>
                     {row.adjuster_observation ? (

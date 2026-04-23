@@ -69,7 +69,7 @@ const FACTUAL_DIVERGENCE_PREFIX =
   "Multiple vision models gave incompatible accounts of this evidence (for example, whether another vehicle or a conflict appears). " +
   "Treat the timeline and narrative below as provisional until a human adjuster reviews the source file.\n\n---\n\n";
 
-/** Two events within this window (seconds) are treated as the same incident. */
+/** Two events within this window (seconds) are treated as the same incident. Keep in sync with `TIMELINE_MATCH_WINDOW_S` in `factual-divergence.ts`. */
 const TIMESTAMP_TOLERANCE_S = 2;
 
 function classifyAgreement(delta: number): "strong" | "moderate" | "weak" {
@@ -258,6 +258,8 @@ function mergeTimelines(
     let fault = ev.suggested_liability_percent;
     let matchCount = 1;
     const tags = new Set(ev.violation_tags ?? []);
+    let frame_index = ev.frame_index;
+    let evidence_span = ev.evidence_span;
 
     for (const secondary of secondaries) {
       const match = secondary.reduce<VlaTimelineEvent | null>((best, s) => {
@@ -271,11 +273,15 @@ function mergeTimelines(
         fault += match.suggested_liability_percent;
         matchCount++;
         for (const tag of match.violation_tags ?? []) tags.add(tag);
+        if (frame_index == null && match.frame_index != null) frame_index = match.frame_index;
+        if (evidence_span == null && match.evidence_span != null) evidence_span = match.evidence_span;
       }
     }
 
     return {
       ...ev,
+      ...(frame_index != null ? { frame_index } : {}),
+      ...(evidence_span != null ? { evidence_span } : {}),
       suggested_liability_percent: Math.round(fault / matchCount),
       violation_tags: [...tags],
     };

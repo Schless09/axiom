@@ -118,6 +118,8 @@ function ModelBreakdownPanel({
             case_file_narrative?: string;
             timeline?: {
               timestamp_seconds?: number;
+              frame_index?: number;
+              evidence_span?: { start_seconds?: number; end_seconds?: number };
               action?: string;
               suggested_liability_percent?: number;
               adjuster_observation?: string;
@@ -165,6 +167,16 @@ function ModelBreakdownPanel({
                             <span className="font-mono text-muted-foreground">
                               {ev.timestamp_seconds.toFixed(1)}s
                             </span>
+                          ) : null}
+                          {ev.evidence_span &&
+                          typeof ev.evidence_span.start_seconds === "number" &&
+                          typeof ev.evidence_span.end_seconds === "number" ? (
+                            <span className="font-mono text-muted-foreground">
+                              [{ev.evidence_span.start_seconds.toFixed(1)}–{ev.evidence_span.end_seconds.toFixed(1)}s]
+                            </span>
+                          ) : null}
+                          {typeof ev.frame_index === "number" ? (
+                            <span className="font-mono text-[10px] text-muted-foreground">f{ev.frame_index}</span>
                           ) : null}
                           <span className="font-medium">{ev.action ?? "—"}</span>
                           {ev.suggested_liability_percent != null ? (
@@ -589,6 +601,8 @@ export default async function ClaimScorecardPage({ params }: PageProps) {
   const timeline = Array.isArray(raw?.timeline)
     ? (raw.timeline as {
         timestamp_seconds?: number;
+        frame_index?: number;
+        evidence_span?: { start_seconds?: number; end_seconds?: number };
         action?: string;
         suggested_liability_percent?: number;
         adjuster_observation?: string;
@@ -600,6 +614,8 @@ export default async function ClaimScorecardPage({ params }: PageProps) {
     ? (raw.statute_matches as {
         action?: string;
         timestamp_seconds?: number;
+        frame_index?: number;
+        evidence_span?: { start_seconds?: number; end_seconds?: number };
         statute?: { statute_code?: string; description?: string } | null;
       }[])
     : [];
