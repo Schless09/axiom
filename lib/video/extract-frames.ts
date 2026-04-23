@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeFile, readFile, rm, mkdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const ffmpegPath: string = require("ffmpeg-static");
+import { resolveFfmpegPath } from "@/lib/video/resolve-ffmpeg";
 
 const execFileAsync = promisify(execFile);
 
@@ -54,7 +53,7 @@ export async function extractVideoFrames(
         `not(mod(round(t-${denseSeconds}),${sparseIntervalSeconds}))` +       // sparse after
       `)`;
 
-    await execFileAsync(ffmpegPath, [
+    await execFileAsync(resolveFfmpegPath(), [
       "-i", inputPath,
       "-vf", `select='${selectExpr}',setpts=N/TB`,
       "-vsync", "vfr",

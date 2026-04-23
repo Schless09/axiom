@@ -7,9 +7,8 @@ import { writeFile, readFile, rm, mkdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { getOrgIdForUser } from "@/lib/supabase/org";
+import { resolveFfmpegPath } from "@/lib/video/resolve-ffmpeg";
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const ffmpegPath: string = require("ffmpeg-static");
 const execFileAsync = promisify(execFile);
 
 /**
@@ -24,7 +23,7 @@ async function toH264Mp4(inputBuffer: Buffer): Promise<Buffer> {
   try {
     await mkdir(workDir, { recursive: true });
     await writeFile(inputPath, inputBuffer);
-    await execFileAsync(ffmpegPath, [
+    await execFileAsync(resolveFfmpegPath(), [
       "-i", inputPath,
       "-c:v", "libx264",
       "-c:a", "aac",
