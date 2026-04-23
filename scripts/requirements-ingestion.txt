@@ -1,0 +1,3 @@
+# Optional: Axiom VLA offline / training data ingestion
+opencv-python-headless>=4.9.0
+supabase>=2.0.0

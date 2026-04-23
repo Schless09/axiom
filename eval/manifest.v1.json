@@ -1,0 +1,149 @@
+{
+  "manifest_version": "1.0.0",
+  "dataset_label": "ccd-local-20",
+  "updated_at": "2026-04-07",
+  "clips": [
+    {
+      "id": "ccd-000001",
+      "source": { "dataset": "CCD", "original_id": "000001" },
+      "media": { "type": "local_relative", "path": "eval/media/000001.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": {
+        "notes": "CCD: Day, Normal weather, ego involved. Add statute_codes_any / violation_types_any after you review the clip."
+      }
+    },
+    {
+      "id": "ccd-000002",
+      "source": { "dataset": "CCD", "original_id": "000002" },
+      "media": { "type": "local_relative", "path": "eval/media/000002.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Normal, ego Yes." }
+    },
+    {
+      "id": "ccd-000003",
+      "source": { "dataset": "CCD", "original_id": "000003" },
+      "media": { "type": "local_relative", "path": "eval/media/000003.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Normal, ego Yes." }
+    },
+    {
+      "id": "ccd-000004",
+      "source": { "dataset": "CCD", "original_id": "000004" },
+      "media": { "type": "local_relative", "path": "eval/media/000004.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Normal, ego Yes." }
+    },
+    {
+      "id": "ccd-000005",
+      "source": { "dataset": "CCD", "original_id": "000005" },
+      "media": { "type": "local_relative", "path": "eval/media/000005.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Snowy, ego Yes." }
+    },
+    {
+      "id": "ccd-000006",
+      "source": { "dataset": "CCD", "original_id": "000006" },
+      "media": { "type": "local_relative", "path": "eval/media/000006.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Snowy, ego Yes." }
+    },
+    {
+      "id": "ccd-000007",
+      "source": { "dataset": "CCD", "original_id": "000007" },
+      "media": { "type": "local_relative", "path": "eval/media/000007.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Snowy, ego No." }
+    },
+    {
+      "id": "ccd-000008",
+      "source": { "dataset": "CCD", "original_id": "000008" },
+      "media": { "type": "local_relative", "path": "eval/media/000008.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Normal, ego Yes." }
+    },
+    {
+      "id": "ccd-000009",
+      "source": { "dataset": "CCD", "original_id": "000009" },
+      "media": { "type": "local_relative", "path": "eval/media/000009.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Normal, ego Yes." }
+    },
+    {
+      "id": "ccd-000010",
+      "source": { "dataset": "CCD", "original_id": "000010" },
+      "media": { "type": "local_relative", "path": "eval/media/000010.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Night, Rainy, ego Yes." }
+    },
+    {
+      "id": "ccd-000011",
+      "source": { "dataset": "CCD", "original_id": "000011" },
+      "media": { "type": "local_relative", "path": "eval/media/000011.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Normal, ego Yes." }
+    },
+    {
+      "id": "ccd-000012",
+      "source": { "dataset": "CCD", "original_id": "000012" },
+      "media": { "type": "local_relative", "path": "eval/media/000012.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Rainy, ego Yes." }
+    },
+    {
+      "id": "ccd-000013",
+      "source": { "dataset": "CCD", "original_id": "000013" },
+      "media": { "type": "local_relative", "path": "eval/media/000013.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Normal, ego Yes." }
+    },
+    {
+      "id": "ccd-000014",
+      "source": { "dataset": "CCD", "original_id": "000014" },
+      "media": { "type": "local_relative", "path": "eval/media/000014.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Normal, ego Yes." }
+    },
+    {
+      "id": "ccd-000015",
+      "source": { "dataset": "CCD", "original_id": "000015" },
+      "media": { "type": "local_relative", "path": "eval/media/000015.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Normal, ego Yes (late crash frame)." }
+    },
+    {
+      "id": "ccd-000016",
+      "source": { "dataset": "CCD", "original_id": "000016" },
+      "media": { "type": "local_relative", "path": "eval/media/000016.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Rainy, ego Yes." }
+    },
+    {
+      "id": "ccd-000017",
+      "source": { "dataset": "CCD", "original_id": "000017" },
+      "media": { "type": "local_relative", "path": "eval/media/000017.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Snowy, ego Yes." }
+    },
+    {
+      "id": "ccd-000018",
+      "source": { "dataset": "CCD", "original_id": "000018" },
+      "media": { "type": "local_relative", "path": "eval/media/000018.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Normal, ego Yes." }
+    },
+    {
+      "id": "ccd-000019",
+      "source": { "dataset": "CCD", "original_id": "000019" },
+      "media": { "type": "local_relative", "path": "eval/media/000019.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Snowy, ego Yes." }
+    },
+    {
+      "id": "ccd-000020",
+      "source": { "dataset": "CCD", "original_id": "000020" },
+      "media": { "type": "local_relative", "path": "eval/media/000020.mp4" },
+      "jurisdiction": { "state_code": "IL" },
+      "ground_truth": { "notes": "CCD: Day, Snowy, ego Yes." }
+    }
+  ]
+}

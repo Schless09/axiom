@@ -20,6 +20,10 @@
 # production
 /build
 
+# eval media (CCD, etc.) — keep manifests in git, not large video files
+/eval/media/*
+!/eval/media/.gitkeep
+
 # misc
 .DS_Store
 *.pem
@@ -39,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# cursor / local IDE
+.cursor/
