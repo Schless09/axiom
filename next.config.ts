@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "100mb",
     },
+    // Middleware clones the body for auth refresh; default cap is 10MB and truncates
+    // Server Action posts before `bodySizeLimit` is applied — breaks large FormData uploads.
+    middlewareClientMaxBodySize: "100mb",
+    // Next 15.5+ internal proxy for Server Actions uses a separate default (10MB).
+    proxyClientMaxBodySize: "100mb",
   },
 };
 
