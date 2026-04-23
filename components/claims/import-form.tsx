@@ -555,7 +555,8 @@ export function ImportForm() {
                   {errorCount > 0 ? ` · ${errorCount} error row${errorCount !== 1 ? "s" : ""} will be skipped` : ""}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Claims will be created as "pending" — upload videos afterward to trigger AI analysis.
+                  Claims will be created as &quot;pending&quot; — upload videos afterward to trigger AI
+                  analysis.
                 </p>
               </div>
               <Button onClick={handleImport} disabled={isPending} className="gap-2 shrink-0">

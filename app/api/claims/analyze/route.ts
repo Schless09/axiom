@@ -234,7 +234,6 @@ async function analyzeVlaEvidence(
  */
 async function analyzeMultiAngle(
   videoItems: Array<{ ev: EvidenceRow; buf: Buffer; mime: string }>,
-  perspective: DashcamPerspective,
 ): Promise<Buffer[]> {
   const allFrames: Buffer[] = [];
 
@@ -317,7 +316,7 @@ export async function POST(request: Request) {
   }
 
   // Optionally fetch Phase D GPS columns — gracefully skipped if migration hasn't run.
-  let gpsMap: Map<string, { gps_lat: number | null; gps_lon: number | null }> = new Map();
+  const gpsMap: Map<string, { gps_lat: number | null; gps_lon: number | null }> = new Map();
   try {
     const { data: gpsRows } = await supabase
       .from("evidence")
@@ -432,7 +431,7 @@ export async function POST(request: Request) {
 
         if (useMultiAngle) {
           dlog(`multi-angle mode: combining frames from ${videoItems.length} video sources`);
-          sharedVideoFrames = await analyzeMultiAngle(videoItems, perspective);
+          sharedVideoFrames = await analyzeMultiAngle(videoItems);
 
           // Mark all video evidence as jointly analyzed
           await Promise.allSettled(
@@ -737,7 +736,7 @@ export async function POST(request: Request) {
 
         // Write final claim status. Try with synthesis_raw first; fall back without it
         // if the Phase D migration hasn't been run yet.
-        let { error: claimUpdateError } = await supabase
+        const { error: claimUpdateError } = await supabase
           .from("claims")
           .update({
             status: "completed",

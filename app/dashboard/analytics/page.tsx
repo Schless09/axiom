@@ -10,7 +10,6 @@ import {
   Zap,
   Activity,
   MapPin,
-  Clock,
   ListChecks,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -137,21 +136,6 @@ function KpiCard({
   );
 }
 
-function LiabilityBucket({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
-  const pct = total > 0 ? (count / total) * 100 : 0;
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium tabular-nums">{count}</span>
-      </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-        <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
-}
-
 function ConfidenceBar({ high, medium, low, total }: { high: number; medium: number; low: number; total: number }) {
   if (total === 0) return <span className="text-xs text-muted-foreground">—</span>;
   const hp = (high / total) * 100;
@@ -172,20 +156,6 @@ function DeltaBar({ delta, max }: { delta: number; max: number }) {
   return (
     <div className="h-1.5 w-20 overflow-hidden rounded-full bg-muted">
       <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${width}%` }} />
-    </div>
-  );
-}
-
-/** Inline mini spark bar for trend — purely CSS, no external chart lib. */
-function SparkBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
-  return (
-    <div className="flex h-8 items-end">
-      <div
-        className={cn("w-5 rounded-t transition-all", color)}
-        style={{ height: `${Math.max(4, pct)}%` }}
-        title={String(value)}
-      />
     </div>
   );
 }
@@ -245,11 +215,6 @@ export default async function AnalyticsPage() {
     completedClaims.filter((c) => c.liability_score != null).length > 0
       ? completedClaims.reduce((s, c) => s + (c.liability_score ?? 0), 0) /
         completedClaims.filter((c) => c.liability_score != null).length
-      : null;
-
-  const avgAdjFault =
-    withBothScores.length > 0
-      ? withBothScores.reduce((s, c) => s + (c.claim_reviews![0].adjuster_fault_percent ?? 0), 0) / withBothScores.length
       : null;
 
   const deltas = withBothScores.map((c) => c.claim_reviews![0].adjuster_fault_percent! - c.liability_score!);

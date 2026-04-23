@@ -27,8 +27,7 @@ export async function extractVideoFrames(
   videoBuffer: Buffer,
   mimeType: string,
   maxFrames = 20,
-  intervalSeconds = 1,   // kept for back-compat; used as Phase 1 interval
-  denseSeconds = 15,     // how many seconds to sample at 1fps
+  denseSeconds = 15, // how many seconds to sample at 1fps
   sparseIntervalSeconds = 3, // interval after the dense window
 ): Promise<Buffer[]> {
   const ext =

@@ -25,8 +25,6 @@
  */
 
 import type { VlaAnalysis } from "@/lib/ai/vla-schemas";
-import type { PolicyEvidenceAnalysis } from "@/lib/ai/vla-schemas";
-import type { DamagePhotoAnalysis } from "@/lib/ai/vla-schemas";
 import type {
   SynthesisResult,
   EvidenceSummary,
@@ -99,7 +97,7 @@ function extractConfidence(raw: Record<string, unknown>): string | undefined {
   return typeof conf === "string" ? conf : undefined;
 }
 
-function extractKeyFindings(raw: Record<string, unknown>, sourceType: string): string[] {
+function extractKeyFindings(raw: Record<string, unknown>): string[] {
   const findings: string[] = [];
 
   // VLA analysis
@@ -301,7 +299,7 @@ export async function synthesizeClaim(
       weight,
       liability_percent: liability,
       confidence,
-      key_findings: extractKeyFindings(inp.analysis_raw, inp.source_type),
+      key_findings: extractKeyFindings(inp.analysis_raw),
     };
   });
 

@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   AlertTriangle,
   TrendingUp,
-  TrendingDown,
   Clock,
   Brain,
   ListChecks,
@@ -14,7 +13,6 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getOrgIdForUser } from "@/lib/supabase/org";
 import { buttonVariants } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Review Queue — Axiom VLA" };
