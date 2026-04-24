@@ -31,7 +31,7 @@ export type HeroDemoScenario = {
   completedIn: string;
 };
 
-/** Rotated on the marketing hero — see `app/page.tsx` (server random index). */
+/** Marketing hero rotates client-side on each page load — see `AgenticHeroPanel`. */
 export const HERO_DEMO_SCENARIOS: readonly HeroDemoScenario[] = [
   {
     claimId: "CLM-2A4F9B",
@@ -114,21 +114,49 @@ const SCORE_TONE_STYLES: Record<
   },
 };
 
-type Props = {
-  /** Picked on the server per page load so the demo is not identical every visit. */
-  variantIndex: number;
-};
+function pickScenario(variantIndex: number | undefined): HeroDemoScenario {
+  const list = HERO_DEMO_SCENARIOS;
+  const n = list.length;
+  if (n === 0) {
+    throw new Error("HERO_DEMO_SCENARIOS must not be empty");
+  }
+  const v = Number(variantIndex);
+  // `undefined % n` is NaN; `array[NaN]` is undefined — guard for missing/invalid props.
+  const idx =
+    Number.isFinite(v) ? ((Math.trunc(v) % n) + n) % n : 0;
+  return list[idx] ?? list[0];
+}
 
-export function AgenticHeroPanel({ variantIndex }: Props) {
-  const scenario = HERO_DEMO_SCENARIOS[variantIndex % HERO_DEMO_SCENARIOS.length]!;
-  const tone = SCORE_TONE_STYLES[scenario.scoreTone];
-
+/**
+ * Hero demo scenario is chosen in the browser on each full page load so localhost
+ * and CDN caches don’t freeze one variant. Brief pulse placeholder avoids SSR/hydration mismatch.
+ */
+export function AgenticHeroPanel() {
+  const [scenarioIdx, setScenarioIdx] = useState<number | null>(null);
   const [step, setStep] = useState(0);
 
   useEffect(() => {
+    setScenarioIdx(Math.floor(Math.random() * HERO_DEMO_SCENARIO_COUNT));
+  }, []);
+
+  useEffect(() => {
+    if (scenarioIdx === null) return;
+    setStep(0);
     const timers = STEPS.map(({ at, id }) => setTimeout(() => setStep(id), at));
     return () => timers.forEach(clearTimeout);
-  }, []);
+  }, [scenarioIdx]);
+
+  if (scenarioIdx === null) {
+    return (
+      <div
+        className="min-h-[520px] animate-pulse overflow-hidden rounded-2xl border border-border/80 bg-muted/40 shadow-2xl"
+        aria-hidden
+      />
+    );
+  }
+
+  const scenario = pickScenario(scenarioIdx);
+  const tone = SCORE_TONE_STYLES[scenario.scoreTone];
 
   const show = (min: number) => step >= min;
   const analyzing = step >= 2 && step < 6;

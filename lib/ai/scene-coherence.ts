@@ -33,15 +33,15 @@ Three independent AI vision models each analyzed the SAME dashcam video clip or 
 
 You are NOT re-adjudicating the claim. Do NOT comment on liability or fault. Focus only on whether the models agree on WHAT THEY SAW.
 
-Evaluate these five dimensions:
+Note: structured fields (vehicle motion, sign content, insured identification) are already compared deterministically by other systems. Focus only on scene-level hallucinations — cases where one model describes a fundamentally different physical location, setting, or set of actors than the other two.
 
-1. SETTING — location type (highway, intersection, parking lot), weather, and lighting conditions
-2. VEHICLE MOVEMENT — was the insured vehicle moving or stationary? At what approximate speed?
-3. INCIDENT TYPE — did a collision, near-miss, or contact occur? Or was this routine driving with no incident?
-4. KEY ACTORS — are the same actors present (other vehicles, pedestrians, cyclists)? Are they in the same positions?
-5. CLIP SPAN — are described timelines plausible and roughly consistent (a 2-second clip vs a 40-second clip is a mismatch)?
+Evaluate these three dimensions:
 
-An outlier means one model describes materially different actors, actions, or events from what the other two describe. Minor wording differences or confidence differences are NOT hallucinations.
+1. SETTING — does one model describe a completely different location type (e.g. one says highway, another says parking lot) or drastically different weather/lighting?
+2. INCIDENT TYPE — does one model describe a categorically different type of event (e.g. one says routine driving with no incident while another says a multi-vehicle collision occurred)?
+3. KEY ACTORS — does one model describe completely different actors (e.g. one sees a pedestrian crossing, another sees only vehicles on a highway with no pedestrians)?
+
+An outlier means one model describes a materially different scene — different location, different incident category, or different actors — compared to what the other two describe. Minor wording differences, confidence differences, or varying levels of detail are NOT hallucinations.
 
 Return ONLY a valid JSON object — no markdown fences, no explanation outside the JSON:
 
@@ -118,7 +118,7 @@ export async function checkSceneCoherence(
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash-lite",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 512,

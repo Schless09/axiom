@@ -7,45 +7,34 @@ export type FactualDivergenceAssessment = {
   reasons: string[];
 };
 
-const MATERIAL_FIELDS = ["another_vehicle_present", "conflict_or_contact"] as const;
+/** All material_facts fields that should agree across models. */
+const MATERIAL_FIELDS = [
+  "another_vehicle_present",
+  "conflict_or_contact",
+  "vehicle_motion",
+  "insured_identifiable",
+  "turn_restriction",
+] as const;
 
 /** Must stay in sync with `TIMESTAMP_TOLERANCE_S` in `consensus.ts` (merge / match window). */
 const TIMELINE_MATCH_WINDOW_S = 2;
 
-/** Same primary preference as `buildConsensus` — anchor timeline comparison on this model when present. */
-const PRIMARY_ORDER: ModelProvider[] = ["gemini", "anthropic", "openai"];
+/** Default primary for timeline alignment (matches insured-perspective consensus). */
+const PRIMARY_ORDER_INSURED: ModelProvider[] = ["gemini", "anthropic", "openai"];
+/** Witness POV: prefer Claude-first ordering (matches `buildConsensus` witness priority). */
+const PRIMARY_ORDER_WITNESS: ModelProvider[] = ["anthropic", "gemini", "openai"];
 
-function analysisTextBlob(a: VlaAnalysis): string {
-  return [
-    a.narrative_summary,
-    a.case_file_narrative,
-    ...a.timeline.map((t) => `${t.action} ${t.adjuster_observation ?? ""}`),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
-/** Coarse signal when `material_facts` is missing — catches “crash vs nothing happened” splits. */
-function narrativeIncidentSignal(text: string): "conflict" | "none_reported" | "unclear" {
-  const conflictHit =
-    /\b(third[- ]party|opposing (vehicle|traffic)|oncoming vehicle|left turn|turned (left|into)|collision|struck\b|near[- ]miss|obstruct(ed)?\s+(the\s+)?(path|lane)|into (the\s+)?insured|cross(ed)?\s+into)\b/i.test(
-      text,
-    );
-  const noneHit =
-    /\b(no (other|third)[- ]party|no collision|no near[- ]miss|no other vehicles?|without incident|cleared the (crossing|intersection)|routine travel|not involved in any incident|no third-party)\b/i.test(
-      text,
-    );
-  if (conflictHit && noneHit) return "unclear";
-  if (conflictHit) return "conflict";
-  if (noneHit) return "none_reported";
-  return "unclear";
+function primaryOrderForPerspective(
+  perspective: "insured" | "witness" | "adverse" | undefined,
+): ModelProvider[] {
+  return perspective === "witness" ? PRIMARY_ORDER_WITNESS : PRIMARY_ORDER_INSURED;
 }
 
 /**
- * Any mismatch on yes / no / uncertain across models is material — e.g. two models say
- * "no contact" while a third says "uncertain" must surface as divergence (previously
- * only yes-vs-no was detected and "uncertain" was ignored).
+ * Strict mismatch on any material_facts field (including new structured fields).
+ * Any disagreement across yes / no / uncertain / stationary / moving / prohibited / permitted etc.
+ * surfaces as a divergence reason — comparison is deterministic field equality, no regex.
+ * Fields whose value is null/undefined for ALL models are skipped (not applicable to the clip).
  */
 function materialFactsStrictMismatch(
   entries: Partial<Record<ModelProvider, NonNullable<VlaAnalysis["material_facts"]>>>,
@@ -55,9 +44,10 @@ function materialFactsStrictMismatch(
     const values: string[] = [];
     for (const mf of Object.values(entries)) {
       if (!mf) continue;
-      const v = mf[field];
-      if (v === "yes" || v === "no" || v === "uncertain") values.push(v);
+      const v = mf[field as keyof typeof mf];
+      if (v != null) values.push(String(v));
     }
+    if (values.length < 2) continue;
     const unique = new Set(values);
     if (unique.size > 1) {
       reasons.push(
@@ -69,17 +59,18 @@ function materialFactsStrictMismatch(
 }
 
 /**
- * If the primary timeline’s events don’t line up in time with another model’s timeline,
+ * If the primary timeline's events don't line up in time with another model's timeline,
  * the models are likely narrating different interpretations of the same clip (even when
  * liability scores agree at 0 %).
  */
 function assessTimelineMisalignment(
   runs: { provider: ModelProvider; analysis: VlaAnalysis }[],
+  perspective: "insured" | "witness" | "adverse" | undefined,
 ): { divergent: boolean; reasons: string[] } {
   if (runs.length < 2) return { divergent: false, reasons: [] };
 
-  const primary =
-    PRIMARY_ORDER.map((p) => runs.find((r) => r.provider === p)).find(Boolean) ?? runs[0];
+  const order = primaryOrderForPerspective(perspective);
+  const primary = order.map((p) => runs.find((r) => r.provider === p)).find(Boolean) ?? runs[0];
   const primaryTl = primary.analysis.timeline ?? [];
   if (primaryTl.length === 0) return { divergent: false, reasons: [] };
 
@@ -93,7 +84,9 @@ function assessTimelineMisalignment(
     let matched = 0;
     for (const ev of primaryTl) {
       const ts = ev.timestamp_seconds ?? 0;
-      const hasNear = st.some((s) => Math.abs((s.timestamp_seconds ?? 0) - ts) <= TIMELINE_MATCH_WINDOW_S);
+      const hasNear = st.some(
+        (s) => Math.abs((s.timestamp_seconds ?? 0) - ts) <= TIMELINE_MATCH_WINDOW_S,
+      );
       if (hasNear) matched++;
     }
     const rate = matched / primaryTl.length;
@@ -108,17 +101,28 @@ function assessTimelineMisalignment(
   return { divergent: reasons.length > 0, reasons };
 }
 
+export type AssessFactualDivergenceOptions = {
+  perspective?: "insured" | "witness" | "adverse";
+};
+
 /**
- * Detect whether successful model runs describe materially incompatible versions of the evidence.
- * Order: strict `material_facts` agreement (including `uncertain` vs yes/no), structural timeline
- * alignment vs the primary model, then narrative phrase heuristics.
+ * Detect whether model runs describe materially incompatible versions of the evidence.
+ *
+ * All checks accumulate reasons so the review queue shows every split (e.g. motion mismatch
+ * AND sign contradiction in the same run), not only the first hit.
+ *
+ * Disagreement detection is entirely deterministic structured-field comparison + timestamp math.
+ * No regex or prose parsing — new failure modes are handled by adding fields to material_facts.
  */
 export function assessFactualDivergence(
   runs: { provider: ModelProvider; analysis: VlaAnalysis }[],
+  options: AssessFactualDivergenceOptions = {},
 ): FactualDivergenceAssessment {
   if (runs.length < 2) {
     return { divergent: false, reasons: [] };
   }
+
+  const reasons: string[] = [];
 
   const withFacts = Object.fromEntries(
     runs
@@ -127,28 +131,10 @@ export function assessFactualDivergence(
   ) as Partial<Record<ModelProvider, NonNullable<VlaAnalysis["material_facts"]>>>;
 
   if (Object.keys(withFacts).length >= 2) {
-    const { divergent, reasons } = materialFactsStrictMismatch(withFacts);
-    if (divergent) return { divergent, reasons };
+    reasons.push(...materialFactsStrictMismatch(withFacts).reasons);
   }
 
-  const timelineCheck = assessTimelineMisalignment(runs);
-  if (timelineCheck.divergent) return timelineCheck;
+  reasons.push(...assessTimelineMisalignment(runs, options.perspective).reasons);
 
-  const signals = runs.map((r) => ({
-    provider: r.provider,
-    signal: narrativeIncidentSignal(analysisTextBlob(r.analysis)),
-  }));
-
-  const hasConflict = signals.some((s) => s.signal === "conflict");
-  const hasNone = signals.some((s) => s.signal === "none_reported");
-  if (hasConflict && hasNone) {
-    return {
-      divergent: true,
-      reasons: [
-        "models diverged on whether another vehicle / conflict is visible (narrative heuristic — confirm on source video)",
-      ],
-    };
-  }
-
-  return { divergent: false, reasons: [] };
+  return { divergent: reasons.length > 0, reasons };
 }

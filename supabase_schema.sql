@@ -43,7 +43,7 @@ create table public.evidence (
   org_id uuid not null references public.organizations(id),
   claim_id uuid references public.claims(id) on delete cascade,
   file_path text not null,        -- Supabase storage path: {org_id}/{user_id}/{claim_id}/...
-  file_type text,                 -- 'video' | 'image'
+  file_type text,                 -- 'video' | 'image' | 'document' | null (PDFs often null for legacy DBs)
   source_type text not null default 'dashcam_video'
     check (source_type in (
       'dashcam_video', 'surveillance_video', 'bystander_video', 'telematics_video',

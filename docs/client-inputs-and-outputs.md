@@ -92,7 +92,24 @@ On the scorecard, after AI output exists, adjusters can supply:
 
 ---
 
-### 1.6 Technical / deployment inputs (if the client runs their own instance)
+### 1.6 Report style samples (onboarding, optional but high-value)
+
+To calibrate AI narrative output to a carrier's or TPA's **exact house style**, the client may supply one or more **sanitized sample reports** from closed claims. These are used to set the tone, terminology, and section structure of `case_file_narrative` output so the AI writes in a format their adjusters recognize and trust.
+
+| Input | Required? | Notes |
+|-------|-----------|-------|
+| **Closed claim report sample(s)** | Optional | 1–3 examples of a completed adjuster report in the client's preferred format. Must be **sanitized** — no claimant PII, no open-matter details. PDF, Word, or plain text accepted. |
+| **Terminology preferences** | Optional | Notes on house style: e.g. "we say 'claimant unit' not 'adverse vehicle'" or "do not include reserve recommendations in AI output." Can be a short paragraph rather than a full sample. |
+
+**Why this matters:** Without a style sample, the AI defaults to a generic senior-adjuster voice. With even one real report, the system can match vocabulary, section order, confidence language, and conclusion framing to what the client's team already reads and approves — dramatically reducing adjuster friction and review time.
+
+**How it is used:** Style samples are stored at the **org level** and injected as a formatting example in the AI prompt at inference time (few-shot style matching). No PII from the sample is retained in the AI output or stored with active claims.
+
+*Collect these during onboarding or pre-pilot scoping. Asking for a sanitized sample is also a strong signal-of-intent question — clients who share one are genuinely evaluating the integration.*
+
+---
+
+### 1.7 Technical / deployment inputs (if the client runs their own instance)
 
 Not “claims data,” but required to operate a private deployment:
 
@@ -100,7 +117,7 @@ Not “claims data,” but required to operate a private deployment:
 - Model API keys (**Gemini** required for core flows; **OpenAI** / **Anthropic** optional for multi-model consensus).
 - Optional: **Resend** for “analysis complete” email, **Sentry** for error reporting, **OpenWeatherMap** (if used in your deployment) for weather context, app URL for links in emails.
 
-*In a typical SaaS arrangement, the vendor hosts these; the client only provides SSO or user provisioning per contract.*
+*In a typical SaaS arrangement, the vendor hosts these; the client only provides SSO or user provisioning per contract. Style samples (§1.6) are always held by the vendor and never exposed to other orgs.*
 
 ---
 
@@ -149,6 +166,8 @@ After analysis completes (`completed` status), the client sees:
 
 *Use case:* pilot agreements, IT integration, or manual filing alongside the claims management system.
 
+**PII and data handling (include in pilot / DPA language):** The JSON export is a **structured copy of what the system derived from the uploaded evidence**, not a redacted record. Police reports, witness statements, medical or repair documents, and similar files often contain **personally identifiable information** — e.g. driver or passenger names, officer or witness identifiers, addresses, phone or policy references, and vehicle descriptions that could be identifying when combined with other data. The model may **repeat or paraphrase** that material inside `analysis` / narrative fields. **Axiom does not automatically redact names or other PII in exports or in stored analysis JSON.** Pilot agreements should state that the **customer (carrier / TPA)** remains responsible for: (1) lawful collection and use of uploads; (2) restricting download and onward sharing of exports to personnel and systems covered by the engagement; (3) retention and deletion consistent with the customer’s records program; and (4) any **manual redaction or sanitization** before sending a file to a third party (e.g. reinsurer, regulator, or outside counsel) if required by policy or law. Treat exported JSON with the same care as the underlying claim file.
+
 ---
 
 ### 2.4 Downloadable: shadow-audit CSV (analytics)
@@ -183,6 +202,7 @@ If outbound email is configured, the user receives an **analysis complete** mess
 2. **Claim number** + **state code**  
 3. At least one **evidence file** under **100 MB** (video, image, PDF, or audio as supported)  
 4. Optional: perspective, extra evidence, GPS/time for richer synthesis  
+5. Optional but recommended at onboarding: **1–3 sanitized sample reports** for style calibration (§1.6)  
 
 **To measure leakage vs historical outcomes**
 

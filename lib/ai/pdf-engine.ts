@@ -20,7 +20,8 @@ export type DocumentSourceType =
   | "witness_statement"
   | "repair_estimate"
   | "medical_record"
-  | "other";
+  | "other"
+  | "unknown";
 
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
@@ -49,7 +50,12 @@ function buildSystemPrompt(sourceType: DocumentSourceType): string {
     repair_estimate: "a vehicle repair estimate or damage appraisal",
     medical_record: "a medical record or injury documentation",
     other: "an insurance claim document",
+    unknown: "an insurance claim document (type unknown — determine from content)",
   };
+
+  const documentTypeInstruction = sourceType === "unknown"
+    ? `"document_type": <determine from content: "police_report" | "recorded_statement" | "witness_statement" | "repair_estimate" | "medical_record" | "other">,`
+    : `"document_type": "${sourceType}",`;
 
   return `You are a senior insurance claims analyst extracting structured data from ${docDescription[sourceType]}.
 
@@ -57,7 +63,7 @@ Extract every factual detail relevant to liability determination. Use only infor
 
 Output a single JSON object (no markdown fences) with this exact shape:
 {
-  "document_type": "${sourceType}",
+  ${documentTypeInstruction}
   "incident_date": "<ISO date string or null>",
   "incident_location": "<street address or intersection or null>",
   "parties": [

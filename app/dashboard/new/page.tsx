@@ -16,8 +16,8 @@ export default async function NewClaimPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">Upload evidence</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Select one or more dashcam videos or images. Set state and claim number per file,
-          then submit — analysis starts automatically and you can track progress in real time.
+          Select one or more files — dashcam video, scene photos, or PDFs such as police reports. Set state and claim
+          number per file, then submit. Analysis starts automatically and you can track progress in real time.
         </p>
         {orgProfile ? (
           <p className="mt-3 text-sm text-muted-foreground">
@@ -29,8 +29,7 @@ export default async function NewClaimPage() {
                 <span className="font-mono text-xs text-muted-foreground">({orgProfile.slug})</span>
               </>
             ) : null}
-            . New accounts receive a personal workspace automatically when the database
-            sign-up trigger is installed.
+            .
           </p>
         ) : user ? (
           <div
@@ -39,16 +38,14 @@ export default async function NewClaimPage() {
           >
             <p className="font-medium">No workspace is linked to this account yet.</p>
             <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
-              Uploads require an organization membership. For local Supabase, run the
-              sign-up provisioning section of{" "}
-              <code className="rounded bg-background/60 px-1 py-0.5 text-xs">supabase_schema.sql</code>{" "}
-              (or{" "}
+              Ask your administrator to assign you to an organization, or for local development run the sign-up
+              provisioning in{" "}
+              <code className="rounded bg-background/60 px-1 py-0.5 text-xs">supabase_schema.sql</code> (or{" "}
               <code className="rounded bg-background/60 px-1 py-0.5 text-xs">
                 supabase_migration_signup_org_provisioning.sql
               </code>
-              ) in the SQL editor so new users get an org and a{" "}
-              <code className="rounded bg-background/60 px-1 py-0.5 text-xs">user_org_memberships</code>{" "}
-              row. Existing users can be added manually in that table.
+              ) so new users receive <code className="rounded bg-background/60 px-1 py-0.5 text-xs">user_org_memberships</code>{" "}
+              automatically.
             </p>
           </div>
         ) : null}

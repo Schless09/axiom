@@ -12,10 +12,7 @@ import {
   ArrowRight,
   Users,
 } from "lucide-react";
-import {
-  AgenticHeroPanel,
-  HERO_DEMO_SCENARIO_COUNT,
-} from "@/components/landing/agentic-hero-panel";
+import { AgenticHeroPanel } from "@/components/landing/agentic-hero-panel";
 import { HowItWorksSection } from "@/components/landing/how-it-works-section";
 
 export default async function Home() {
@@ -25,8 +22,6 @@ export default async function Home() {
   } = await supabase.auth.getUser();
 
   if (user) redirect("/dashboard/new");
-
-  const heroDemoVariantIndex = Math.floor(Math.random() * HERO_DEMO_SCENARIO_COUNT);
 
   return (
     <div className="flex flex-col">
@@ -84,7 +79,7 @@ export default async function Home() {
             {/* Agentic live panel */}
             <div className="relative mx-auto w-full max-w-md lg:max-w-none">
               <div className="absolute -inset-6 rounded-3xl bg-blue-500/10 blur-3xl" aria-hidden />
-              <AgenticHeroPanel variantIndex={heroDemoVariantIndex} />
+              <AgenticHeroPanel />
             </div>
           </div>
         </div>

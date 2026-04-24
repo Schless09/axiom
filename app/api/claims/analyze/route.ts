@@ -29,6 +29,16 @@ const BUCKET = "evidence";
 const DEV = process.env.NODE_ENV === "development";
 const dlog = (...args: unknown[]) => { if (DEV) console.log("[analyze:dev]", ...args); };
 
+/** Map classifier hints to claim-level VLA perspective (DB only stores insured | witness | adverse). */
+function classificationHintToPerspective(
+  hint: string | null | undefined,
+): DashcamPerspective | null {
+  if (!hint) return null;
+  if (hint === "insured" || hint === "witness" || hint === "adverse") return hint;
+  if (hint === "neutral" || hint === "officer") return "witness";
+  return null;
+}
+
 export const maxDuration = 300;
 
 /** Source types that require full VLA (dashcam / video evidence). */
@@ -58,6 +68,27 @@ type EvidenceRow = {
   gps_lon: number | null;
   captured_at: string | null;
 };
+
+/** Storage may omit blob.type; PDF/audio rows may have file_type null (legacy DB check constraints). */
+function resolveEvidenceMime(ev: EvidenceRow, blobType: string): string {
+  const t = blobType?.trim();
+  if (t && t !== "application/octet-stream") return t;
+  if (ev.file_type === "video") return "video/mp4";
+  if (ev.file_type === "image") return "image/jpeg";
+  if (ev.file_type === "document") return "application/pdf";
+  const name = (ev.original_filename ?? "").toLowerCase();
+  const ext = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
+  const extMime: Record<string, string> = {
+    ".pdf": "application/pdf",
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+  };
+  if (ext && extMime[ext]) return extMime[ext];
+  return t || "application/octet-stream";
+}
 
 /**
  * Analyze a single VLA evidence item (dashcam/video/image).
@@ -126,7 +157,7 @@ async function analyzeVlaEvidence(
     throw new Error("All VLA model calls failed");
   }
 
-  const built = await buildConsensus(modelResults);
+  const built = await buildConsensus(modelResults, { perspective });
   const { consensus, raw_by_provider, model_usage, total_cost_usd } = built;
   const analysis = consensus.factual_divergence
     ? { ...built.analysis, recommended_liability_percent: undefined }
@@ -306,7 +337,7 @@ export async function POST(request: Request) {
   // Fetch ALL evidence for this claim — only stable columns (no Phase D migrations required).
   const { data: evidenceList, error: evListError } = await supabase
     .from("evidence")
-    .select("id, file_path, file_type, source_type, original_filename, captured_at")
+    .select("id, file_path, file_type, source_type, original_filename, captured_at, perspective")
     .eq("claim_id", claimId);
 
   if (evListError) {
@@ -339,7 +370,25 @@ export async function POST(request: Request) {
     gps_lon: gpsMap.get(ev.id)?.gps_lon ?? null,
   }));
 
-  await supabase.from("claims").update({ status: "analyzing" }).eq("id", claimId).eq("org_id", orgId);
+  // Only transition pending → analyzing if still pending (avoids duplicate full runs when two clients race).
+  const { data: lockedRows, error: lockError } = await supabase
+    .from("claims")
+    .update({ status: "analyzing" })
+    .eq("id", claimId)
+    .eq("org_id", orgId)
+    .eq("status", "pending")
+    .select("id");
+
+  if (lockError) {
+    console.error("[analyze] lock transition failed:", lockError.message);
+    return NextResponse.json({ error: lockError.message }, { status: 500 });
+  }
+  if (!lockedRows?.length) {
+    return NextResponse.json(
+      { error: "Analysis already started or this claim is not pending." },
+      { status: 409 },
+    );
+  }
 
   return await Sentry.startSpan(
     {
@@ -367,9 +416,7 @@ export async function POST(request: Request) {
             const { data: blob, error } = await supabase.storage.from(BUCKET).download(ev.file_path);
             if (error || !blob) throw new Error(`Download failed for ${ev.id}: ${error?.message}`);
             const buf = Buffer.from(await blob.arrayBuffer());
-            const mime =
-              blob.type ||
-              (ev.file_type === "video" ? "video/mp4" : ev.file_type === "image" ? "image/jpeg" : "application/octet-stream");
+            const mime = resolveEvidenceMime(ev, blob.type ?? "");
             return { ev, buf, mime };
           }),
         );
@@ -391,21 +438,49 @@ export async function POST(request: Request) {
                 .then(({ error }) => { if (error) console.warn("[analyze] source_type update failed:", error.message); });
             }
 
-            const hint = classification.perspective_hint;
-            const validPerspectives = ["insured", "adverse", "witness"] as const;
-            if (
-              classification.confidence >= 0.80 &&
-              hint &&
-              (validPerspectives as readonly string[]).includes(hint) &&
-              claim.dashcam_perspective === "insured" &&
-              hint !== "insured"
-            ) {
-              perspective = hint as DashcamPerspective;
-              supabase.from("claims")
-                .update({ dashcam_perspective: hint })
-                .eq("id", claimId)
-                .eq("org_id", orgId)
-                .then(({ error }) => { if (error) console.warn("[analyze] perspective update failed:", error.message); });
+            const st = classification.source_type;
+            const conf = classification.confidence;
+            const mapped = classificationHintToPerspective(classification.perspective_hint);
+
+            // Bystander / CCTV: the recording device is never the insured vehicle — use witness VLA prompts.
+            const forceWitnessFromSource =
+              st === "bystander_video" || st === "surveillance_video";
+
+            const claimPerspectiveIsDefault =
+              !claim.dashcam_perspective || claim.dashcam_perspective === "insured";
+
+            if (claimPerspectiveIsDefault) {
+              if (forceWitnessFromSource) {
+                perspective = "witness";
+                supabase
+                  .from("claims")
+                  .update({ dashcam_perspective: "witness" })
+                  .eq("id", claimId)
+                  .eq("org_id", orgId)
+                  .then(({ error }) => {
+                    if (error) console.warn("[analyze] perspective update failed:", error.message);
+                  });
+              } else if (mapped === "witness" && conf >= 0.72) {
+                perspective = "witness";
+                supabase
+                  .from("claims")
+                  .update({ dashcam_perspective: "witness" })
+                  .eq("id", claimId)
+                  .eq("org_id", orgId)
+                  .then(({ error }) => {
+                    if (error) console.warn("[analyze] perspective update failed:", error.message);
+                  });
+              } else if (mapped === "adverse" && conf >= 0.82) {
+                perspective = "adverse";
+                supabase
+                  .from("claims")
+                  .update({ dashcam_perspective: "adverse" })
+                  .eq("id", claimId)
+                  .eq("org_id", orgId)
+                  .then(({ error }) => {
+                    if (error) console.warn("[analyze] perspective update failed:", error.message);
+                  });
+              }
             }
           }
         }
@@ -417,7 +492,11 @@ export async function POST(request: Request) {
         const damagePhotoItems = fileBuffers.filter((f) =>
           f.ev.source_type === "damage_photo" || (f.ev.source_type === "other" && f.mime.startsWith("image/")),
         );
-        const documentItems = fileBuffers.filter((f) => PDF_SOURCE_TYPES.has(f.ev.source_type));
+        const documentItems = fileBuffers.filter((f) =>
+          PDF_SOURCE_TYPES.has(f.ev.source_type) ||
+          f.ev.file_type === "document" ||
+          (f.mime.includes("pdf") && !VLA_SOURCE_TYPES.has(f.ev.source_type) && !f.mime.startsWith("image/")),
+        );
         const audioItems = fileBuffers.filter((f) => isAudioMime(f.mime));
 
         dlog("evidence split:", {
@@ -491,6 +570,7 @@ export async function POST(request: Request) {
           synthesisInputs.push({
             evidence_id: primaryItem.ev.id,
             source_type: primaryItem.ev.source_type,
+            perspective: (primaryItem.ev as { perspective?: string | null }).perspective ?? null,
             analysis_raw: vla.vla_analysis_raw,
             gps_lat: primaryItem.ev.gps_lat,
             gps_lon: primaryItem.ev.gps_lon,
@@ -510,6 +590,7 @@ export async function POST(request: Request) {
               synthesisInputs.push({
                 evidence_id: item.ev.id,
                 source_type: item.ev.source_type,
+                perspective: (item.ev as { perspective?: string | null }).perspective ?? null,
                 analysis_raw: vla.vla_analysis_raw,
                 gps_lat: item.ev.gps_lat,
                 gps_lon: item.ev.gps_lon,
@@ -517,9 +598,12 @@ export async function POST(request: Request) {
               });
             }
           } else {
-            // Analyze remaining video items independently
+            // Analyze remaining video items independently, using each item's own perspective
             for (const item of videoItems.slice(1)) {
               try {
+                const itemPerspective =
+                  ((item.ev as { perspective?: string | null }).perspective as "insured" | "witness" | "adverse" | null) ??
+                  perspective;
                 let itemFrames: Buffer[] | null = null;
                 if (item.mime.startsWith("video/")) {
                   itemFrames = await extractVideoFrames(item.buf, item.mime);
@@ -527,7 +611,7 @@ export async function POST(request: Request) {
                 const subVla = await analyzeVlaEvidence(
                   item.buf,
                   item.mime,
-                  perspective,
+                  itemPerspective ?? perspective,
                   claim.state_code as string,
                   supabase,
                   orgId,
@@ -540,6 +624,7 @@ export async function POST(request: Request) {
                 synthesisInputs.push({
                   evidence_id: item.ev.id,
                   source_type: item.ev.source_type,
+                  perspective: (item.ev as { perspective?: string | null }).perspective ?? null,
                   analysis_raw: subVla.vla_analysis_raw,
                   gps_lat: item.ev.gps_lat,
                   gps_lon: item.ev.gps_lon,
@@ -585,6 +670,7 @@ export async function POST(request: Request) {
             synthesisInputs.push({
               evidence_id: item.ev.id,
               source_type: item.ev.source_type,
+              perspective: (item.ev as { perspective?: string | null }).perspective ?? null,
               analysis_raw: damageRaw as unknown as Record<string, unknown>,
               gps_lat: item.ev.gps_lat,
               gps_lon: item.ev.gps_lon,
@@ -605,7 +691,9 @@ export async function POST(request: Request) {
         // ── Analyze documents (police reports, statements, estimates) ─────────
         for (const item of documentItems) {
           try {
-            const sourceType = item.ev.source_type as DocumentSourceType;
+            const sourceType: DocumentSourceType = PDF_SOURCE_TYPES.has(item.ev.source_type)
+              ? (item.ev.source_type as DocumentSourceType)
+              : "unknown";
             const { analysis, rawText, usage, provider } = await analyzeDocument(item.buf, item.mime, sourceType);
             dlog("document analysis:", { id: item.ev.id, source: sourceType, provider });
 
@@ -632,17 +720,24 @@ export async function POST(request: Request) {
             synthesisInputs.push({
               evidence_id: item.ev.id,
               source_type: item.ev.source_type,
+              perspective: (item.ev as { perspective?: string | null }).perspective ?? null,
               analysis_raw: docRaw,
               gps_lat: item.ev.gps_lat,
               gps_lon: item.ev.gps_lon,
               captured_at: item.ev.captured_at,
             });
 
+            // Write raw analysis and write back the AI-classified document_type as source_type
+            const docUpdate: Record<string, unknown> = { vla_analysis_raw: docRaw };
+            if (analysis.document_type && analysis.document_type !== item.ev.source_type) {
+              docUpdate.source_type = analysis.document_type;
+              dlog(`[analyze] auto-classified document ${item.ev.id} as "${analysis.document_type}"`);
+            }
             supabase.from("evidence")
-              .update({ vla_analysis_raw: docRaw })
+              .update(docUpdate)
               .eq("id", item.ev.id)
               .eq("org_id", orgId)
-              .then(({ error }) => { if (error) console.warn("[analyze] doc vla_analysis_raw update failed:", error.message); });
+              .then(({ error }) => { if (error) console.warn("[analyze] doc update failed:", error.message); });
 
             void rawText;
           } catch (e) {
@@ -678,6 +773,7 @@ export async function POST(request: Request) {
             synthesisInputs.push({
               evidence_id: item.ev.id,
               source_type: item.ev.source_type,
+              perspective: (item.ev as { perspective?: string | null }).perspective ?? null,
               analysis_raw: audioRaw,
               gps_lat: item.ev.gps_lat,
               gps_lon: item.ev.gps_lon,
@@ -713,17 +809,21 @@ export async function POST(request: Request) {
         Sentry.setMeasurement("synthesis.final_liability", synthesis.final_liability_percent ?? -1, "none");
         Sentry.setMeasurement("synthesis.review_required", synthesis.review_required ? 1 : 0, "none");
 
-        // Final liability: prefer synthesis when multiple evidence items; otherwise use primary VLA
+        // Final liability: multi-item → synthesis; single video → VLA primary; single PDF/audio/photo → synthesis
+        // (primaryLiability / primarySummary stay null when there is no dashcam VLA run).
         const finalLiability =
           synthesisInputs.length > 1
             ? (synthesis.final_liability_percent ?? primaryLiability)
-            : primaryLiability;
+            : (primaryLiability ?? synthesis.final_liability_percent ?? null);
 
-        // Build the claim summary — synthesis narrative + VLA summary
+        // Claim summary: multi-item uses synthesis narrative; single non-VLA uses synthesis; single video uses VLA text
         const claimSummary = [
           synthesisInputs.length > 1 ? synthesis.synthesis_narrative : null,
+          synthesisInputs.length === 1 && !primarySummary ? synthesis.synthesis_narrative : null,
           primarySummary,
-        ].filter(Boolean).join("\n\n");
+        ]
+          .filter(Boolean)
+          .join("\n\n");
 
         // ── Persist ───────────────────────────────────────────────────────────
         if (primaryVlaRaw) {
@@ -788,9 +888,11 @@ export async function POST(request: Request) {
         console.error("[api/claims/analyze] failed", { claimId, orgId, message });
         if (e instanceof Error && e.stack) console.error(e.stack);
         Sentry.captureException(e);
+        const summaryForClaim =
+          message.length > 2000 ? `${message.slice(0, 2000)}…` : message;
         await supabase
           .from("claims")
-          .update({ status: "error", summary: message })
+          .update({ status: "error", summary: summaryForClaim })
           .eq("id", claimId)
           .eq("org_id", orgId);
         return NextResponse.json({ error: message }, { status: 500 });

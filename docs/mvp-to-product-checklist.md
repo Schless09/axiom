@@ -33,7 +33,7 @@ Use this as a living roadmap. Reorder or split by what your pilot contract actua
 
 ## Tier 3 — Polish and trust
 
-- [x] **Upload form off homepage**: signed-in users redirected from `/` to `/dashboard/new`; `/dashboard/new` page hosts batch `ClaimUploadForm`; homepage is now a pure marketing/conversion page for unauthenticated visitors
+- [x] **Upload form off homepage**: signed-in users redirected from `/` to `/dashboard/new`; `/dashboard/new` page hosts `BatchUploadForm`; homepage is now a pure marketing/conversion page for unauthenticated visitors
 - [x] **Stuck claim recovery**: claims list page auto-marks claims in `analyzing` status for > 15 min as `error` with a retry message; runs silently on every page load; no manual DB intervention needed for timed-out analyses
 - [x] **Video proxy + transcoding**: `/api/claims/[id]/video` route; downloads raw file from Supabase, transcodes to H.264 MP4 with `faststart` via FFmpeg for universal browser playback; caches transcoded sidecar in Storage to avoid repeat transcoding; `ffmpeg-static` dependency
 
@@ -49,7 +49,7 @@ Use this as a living roadmap. Reorder or split by what your pilot contract actua
 - [x] **Observability**: Sentry (client/server/edge), `global-error`, analyze span + duration measurement + `captureException`, server action instrumentation on upload
 - [x] **Cost guardrails**: 100 MB file cap (`uploadClaimEvidence` + `serverActions.bodySizeLimit`), `maxDuration` on analyze route, per-org concurrency cap (max 5 simultaneous analyses, configurable via `MAX_CONCURRENT_ANALYSES` env var → 429), duplicate-analysis guard (409 if claim already `analyzing`)
 - [x] **Data retention & deletion**: `deleteClaim` server action removes Storage objects + DB rows (evidence cascades via FK); `DeleteClaimButton` on scorecard with browser confirmation; document lifecycle in pilot agreement (see note below)
-- [ ] **PII / redaction plan**: `data_ingestion.py` documents redaction before training upload; no in-app face/plate blur yet
+- [ ] **PII / redaction plan**: `data_ingestion.py` documents redaction before training upload; no in-app face/plate blur or export redaction yet — pilot/DPA language for JSON export in `docs/client-inputs-and-outputs.md` section 2.3
 - [x] **Export for pilots**: `GET /api/claims/:id/export` returns a structured JSON report (claim metadata + full VLA analysis + statute matches) as a downloadable file; "Export JSON" button on completed scorecards; report includes AI disclaimer required for pilot agreements
 
 ### Eval harness (measure model + statute alignment)
@@ -59,7 +59,7 @@ Use this as a living roadmap. Reorder or split by what your pilot contract actua
 - [ ] **Run & score**: Upload each clip through the app (or add a batch script), run analyze, compare stored `statute_matches` to manifest expectations via `scoreGroundTruth`; track pass rate over time when prompts/models change; `evidence_analysis.prompt_version` makes this queryable per prompt version
 - [ ] **Optional automation**: One command that iterates manifest clips → upload + analyze + JSON report (not built yet)
 
-> **Data lifecycle note (pilot agreement):** Evidence files are stored in Supabase Storage under `{org_id}/{user_id}/{claim_id}/`. Claims and evidence can be deleted by the uploading user via the scorecard (permanent — removes Storage objects and all DB rows). There is no scheduled auto-deletion; add a retention window to the pilot agreement and implement a cron/pg_cron job when required by contract.
+> **Data lifecycle note (pilot agreement):** Evidence files are stored in Supabase Storage under `{org_id}/{user_id}/{claim_id}/`. Claims and evidence can be deleted by the uploading user via the scorecard (permanent — removes Storage objects and all DB rows). There is no scheduled auto-deletion; add a retention window to the pilot agreement and implement a cron/pg_cron job when required by contract. **JSON export:** may contain PII echoed from police reports and other documents — there is no in-product redaction; spell out customer obligations and handling in the pilot / DPA (see `docs/client-inputs-and-outputs.md`, section 2.3).
 
 ---
 

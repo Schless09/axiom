@@ -64,11 +64,15 @@ EVIDENCE TYPES:
 - other              Does not fit any above category
 
 CAMERA PERSPECTIVE (only for visual/video evidence — null for documents):
-- insured   Recording device is mounted on or operated from the insured/claimant vehicle
-- adverse   Recording device belongs to the opposing party in the claim
-- witness   A neutral third-party vehicle or bystander recorded the event
+- insured   The camera is ON the insured/claimant vehicle (policyholder's car). The viewer sees the road through that vehicle's windshield; the recording vehicle IS the one whose comparative fault is in question. Do NOT use insured if the camera car is merely following other traffic and is never identified as the claimant vehicle.
+- adverse   Recording device belongs to the opposing party in the claim (their dashcam / phone).
+- witness   Camera is on another driver's vehicle or a bystander device; the insured appears as one of the vehicles in the scene but is NOT the camera car. REQUIRED when the clip is "dashcam-style" POV from a vehicle that is only watching traffic ahead / around with no role in the loss (e.g. following behind, no contact, no party identification as claimant).
 - officer   Law enforcement dashcam or body camera
 - neutral   Fixed camera with no party affiliation (e.g. traffic light, parking lot CCTV)
+
+DISAMBIGUATION — insured vs witness (critical):
+- If the footage shows routine driving and the only other vehicles are "traffic ahead" or adjacent lanes with no interaction, and nothing indicates the recording vehicle is the claimant's, use source_type bystander_video (or dashcam_video if unmistakably automotive forward view) with perspective_hint "witness", NOT "insured".
+- HUD/speed overlay in the recording vehicle strongly suggests insured or adverse party POV, not witness — unless context shows it is a ride-along / unrelated vehicle.
 
 Respond with valid JSON only — no markdown, no explanation outside the JSON:
 {

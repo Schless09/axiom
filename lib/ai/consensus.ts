@@ -1,6 +1,7 @@
 import type { VlaAnalysis, VlaTimelineEvent } from "@/lib/ai/vla-schemas";
 import type { ModelUsage } from "@/lib/ai/pricing";
 import { assessFactualDivergence } from "@/lib/ai/factual-divergence";
+import type { DashcamPerspective } from "@/lib/ai/vla-engine";
 import { checkSceneCoherence } from "@/lib/ai/scene-coherence";
 
 export type ModelProvider = "gemini" | "openai" | "anthropic";
@@ -50,6 +51,11 @@ export interface ConsensusMetadata {
   };
 }
 
+export type BuildConsensusOptions = {
+  /** When `witness`, prefer Anthropic as narrative/timeline anchor (see `buildConsensus` doc). */
+  perspective?: DashcamPerspective;
+};
+
 export interface ConsensusResult {
   /** Merged analysis that drives the UI and DB columns. */
   analysis: VlaAnalysis;
@@ -81,7 +87,8 @@ function classifyAgreement(delta: number): "strong" | "moderate" | "weak" {
 /**
  * Merge N model results into a single consensus.
  *
- * Priority order for narrative / timeline anchor: gemini > anthropic > openai.
+ * Priority order for narrative / timeline anchor: gemini > anthropic > openai (insured/adverse).
+ * For witness POV: anthropic > gemini > openai — reduces anchoring on hallucinated "insured vehicle" IDs.
  * Liability = average across all successful models.
  * Overall confidence is downgraded to "low" when models disagree sharply.
  *
@@ -89,10 +96,19 @@ function classifyAgreement(delta: number): "strong" | "moderate" | "weak" {
  * return but before final scores are locked in. Any outlier detected there is
  * appended to `factual_divergence_reasons` and triggers `review_required`.
  */
-export async function buildConsensus(results: ModelResult[]): Promise<ConsensusResult> {
+export async function buildConsensus(
+  results: ModelResult[],
+  options: BuildConsensusOptions = {},
+): Promise<ConsensusResult> {
   if (results.length === 0) {
     throw new Error("buildConsensus: no model results provided");
   }
+
+  const perspective = options.perspective ?? "insured";
+  const PROVIDER_PRIORITY: ModelProvider[] =
+    perspective === "witness"
+      ? ["anthropic", "gemini", "openai"]
+      : ["gemini", "anthropic", "openai"];
 
   const model_usage = results.map((r) => r.usage);
   const total_cost_usd =
@@ -125,6 +141,7 @@ export async function buildConsensus(results: ModelResult[]): Promise<ConsensusR
 
   const factual = assessFactualDivergence(
     results.map((r) => ({ provider: r.provider, analysis: r.analysis })),
+    { perspective },
   );
 
   // Await the coherence check that was kicked off earlier
@@ -171,9 +188,9 @@ export async function buildConsensus(results: ModelResult[]): Promise<ConsensusR
   }
 
   // Choose primary (best anchor for timeline / narratives) by priority
-  const PRIORITY: ModelProvider[] = ["gemini", "anthropic", "openai"];
   const primary =
-    PRIORITY.map((p) => results.find((r) => r.provider === p)).find(Boolean) ?? results[0];
+    PROVIDER_PRIORITY.map((p) => results.find((r) => r.provider === p)).find(Boolean) ??
+    results[0];
 
   // Merge timelines: primary is the anchor, all others contribute
   const secondaryTimelines = results

@@ -4,14 +4,19 @@
 
 **Guiding principle:** This is a founder-led sales motion. There is no brand yet, no case studies yet, and no marketing budget that outperforms a direct conversation. Every day-one activity should be designed to get a human on a call — not to build an audience.
 
+**Language:** Prefer **claims and file-review framing** over engineering framing. See `docs/sales-discovery-guide.md` (“External vs internal framing”). Outbound copy should emphasize **first-pass file package**, **definitive call vs review required**, and **defensible documentation**—not “model disagreement” or “hallucination” as the headline.
+
 ---
 
 ## The Core Message (use this everywhere)
 
-> *"Axiom runs three independent AI models against every piece of claim evidence — dashcam video, damage photos, police reports — and tells you where they agree, where they disagree, and when the score shouldn't be trusted. Statute-cited liability position in under five minutes. Shadow audit CSV in one click. Human adjuster makes the final call."*
+> *"Axiom turns dashcam video, photos, and police reports into a **structured first read** on the file—timeline, narrative, and liability-oriented signals—**fast enough for the real backlog**. When the evidence **doesn’t support a definitive automated call**, Axiom **says so** instead of forcing a number. **Statute-aware context** where it belongs. **Shadow-audit-friendly export** when you need to show what the system produced vs what the examiner decided. **The adjuster still owns the determination.**"*
 
 **One-line version:**
-> *"Three AI models. One liability scorecard. Built for the adjuster, not the demo."*
+> *"A faster, structured evidence read on every file—with clear **review required** when the file doesn’t support a definitive call."*
+
+**Shorter punchy line (if they want a product hook):**
+> *"Built for the examiner’s workflow—not a demo that guesses a percentage."*
 
 ---
 
@@ -28,8 +33,8 @@
 
 ### Day 2 — LinkedIn profile + company page
 
-- Rewrite the founder LinkedIn headline: *"Building AI-powered liability review for auto insurance claims | Axiom"*
-- Summary section: 3 short paragraphs. (1) The problem: dashcam footage sits unwatched, adjusters disagree on the same clip, leakage is invisible. (2) What Axiom does: three-model consensus, statute alignment, adjuster override layer. (3) What you're looking for: TPA and carrier claims leaders willing to run a shadow audit pilot.
+- Rewrite the founder LinkedIn headline: *"Building evidence-to-file review for auto claims | Axiom"* (or *"Faster structured liability reads from dashcam + documents | Axiom"*—avoid leading with “AI-powered” unless the buyer expects it).
+- Summary section: 3 short paragraphs. (1) The problem: dashcam and attachments outpace examiner capacity; two reviewers still read the same clip differently. (2) What Axiom does: structured timeline + memo-style output, **review required** when certainty isn’t there, statute-aware context, audit-friendly exports. (3) What you're looking for: claims leaders open to a **shadow or side-by-side pilot** on real evidence volume.
 - Create a LinkedIn company page for Axiom. Banner image with tagline. About section uses the core message above. Add the URL to the product.
 - Post a first personal LinkedIn post: tell the founding story in 150–200 words. What did you see that made you build this? No product pitching — just the observation that started it. End with a question to drive comments: *"For those in claims operations — how does your team currently handle dashcam evidence review?"*
 
@@ -44,13 +49,13 @@
 Write three outreach message templates:
 
 **Template A — "The video backlog" hook** (for operations-focused buyers):
-> *"Hi [Name] — I noticed [Company] has been expanding its dashcam program. One thing I hear from claims leaders is that the footage piles up faster than adjusters can review it. I built Axiom specifically for that problem — three AI models review the clip, cite the relevant statute, and produce a scorecard the adjuster can approve or override in minutes. Would a 20-minute walk-through make sense? Happy to share a short demo in the meantime."*
+> *"Hi [Name] — I noticed [Company] has been expanding its dashcam program. One thing I hear from claims leaders is that footage piles up faster than the file team can give it a consistent first read. I built Axiom for that—structured timeline and memo-style output on the evidence, statute-aware context, and a clear signal when the file **should go to examiner review** instead of accepting a single automated number. Would a 20-minute walk-through make sense? Happy to share a short demo."*
 
 **Template B — "Shadow audit" hook** (for compliance-focused buyers):
-> *"Hi [Name] — Shadow audit requirements are showing up in more TPA contracts. I built Axiom to make that prep a one-click export instead of a multi-day manual pull — the system tracks AI liability vs adjuster override on every claim automatically. I'd love to show you how it works against your current book. Worth 20 minutes?"*
+> *"Hi [Name] — Shadow audit requirements are showing up in more TPA contracts. I built Axiom so that prep isn’t a multi-day manual pull—**documented system output vs examiner determination** is exportable when you need to show your work. I'd love to show you how it fits a real book. Worth 20 minutes?"*
 
-**Template C — "Single-model AI risk" hook** (for technology-aware buyers):
-> *"Hi [Name] — A lot of carriers are deploying one AI model for liability review and hoping it's right. The problem is there's no signal when it hallucinates. Axiom runs three models independently, then runs a fourth to check if they all watched the same video. When they disagree, the score is withheld — not guessed. I'd like to show you the difference. 20 minutes?"*
+**Template C — "False certainty" hook** (for buyers burned by black-box tools):
+> *"Hi [Name] — A lot of teams are piloting one black-box score on liability. The failure mode isn’t just ‘wrong’—it’s **confident and wrong**, with no clear **review required** flag. Axiom is built the opposite way: independent cross-checks on the same evidence, and **we withhold a definitive automated read** when the file doesn’t support one. I’d like to show you the difference. 20 minutes?"*
 
 ### Day 5 — Send first 15 outreach messages
 
@@ -80,7 +85,7 @@ Write three outreach message templates:
 ### Day 8 — Send second 15 outreach messages
 
 - Send to next 15 Tier 1 and Tier 2 contacts.
-- Introduce Template C (single-model AI risk) to the more tech-forward targets.
+- Introduce Template C (false certainty / black-box risk) to buyers who’ve already tried an AI tool.
 - Follow up with anyone who opened the Day 5 messages but didn't reply (LinkedIn shows read receipts on InMail).
 
 ### Day 9 — LinkedIn article: the leakage piece
@@ -89,7 +94,7 @@ Write and publish a 600–800 word LinkedIn article. Working title: **"You know 
 
 Structure:
 1. The aggregate view is fine. The granular view is missing. Leakage shows up at the jurisdiction level, the adjuster level, the claim type level — not in the annual reserve review.
-2. The core problem: AI vs adjuster delta is only computable if the AI scores every claim. If it scores half, the delta is noise.
+2. The core problem: system-vs-examiner benchmarks are only meaningful if the tool produces a **consistent, documented read on every claim in scope**. Partial coverage makes the dashboard noise.
 3. What a real leakage dashboard looks like: 6-month trend, jurisdiction breakdown, high-variance claim cohort, one-click shadow audit export.
 4. Close: *"If you're preparing for a shadow audit or want to benchmark what your AI tool is actually doing vs your adjusters, I'd like to show you what we've built."*
 
@@ -97,17 +102,17 @@ Do not write a press release. Write an opinion piece from operational experience
 
 ### Day 10 — Engage the Claims Journal and CLM ecosystem
 
-- Submit a contributed article pitch to Claims Journal (claimsjournal.com/contribute) or PropertyCasualty360. Proposed angle: *"Why three AI models beat one for dashcam liability review — and when none of them should score."* This is a 3–6 week lead time; start it now.
-- Find the next CLM (Claims & Litigation Management Alliance) conference or webinar. Identify the speaker submission window. Proposed topic: *"AI-assisted liability review: consensus scoring, hallucination detection, and the adjuster override layer."*
+- Submit a contributed article pitch to Claims Journal (claimsjournal.com/contribute) or PropertyCasualty360. Proposed angle: *"When dashcam review should end in a definitive read—and when it should end in **examiner review**."* This is a 3–6 week lead time; start it now.
+- Find the next CLM (Claims & Litigation Management Alliance) conference or webinar. Identify the speaker submission window. Proposed topic: *"Evidence-to-file review at scale: structured first reads, defensible documentation, and keeping the examiner in charge."*
 - Connect on LinkedIn with 5 industry journalists/editors at Claims Journal, Insurance Journal, and Digital Insurance. No pitch yet — just connect with a note: *"I'm building in the claims tech space and enjoy your coverage."*
 
-### Day 11 — The "four AI models" post
+### Day 11 — The "false certainty" post
 
-Personal LinkedIn post, 200 words. Working title: **"Every AI claims tool I've seen uses one model. Here's why that's a problem."**
+Personal LinkedIn post, 200 words. Working title: **"The dashcam liability score that scares me isn’t the wrong number—it’s the confident one."**
 
-Body: Explain in plain language what happens when one model hallucinates on a dashcam clip — it gives a number, the adjuster trusts it, the claim closes. No one knows. Now explain what happens when three models disagree by 30 percentage points — you know something is wrong before the adjuster touches it. Close: *"That's why Axiom runs four. Three to analyze, one to check if the first three watched the same video."*
+Body: In plain language: one automated read can **sound definitive** on a clip that doesn’t actually support it; the file closes; nobody labeled it **provisional**. Contrast with a workflow that **withholds a definitive read** and routes ambiguous files to **examiner review** *before* reliance. Mention independent cross-checks only as *how* you catch overconfidence—not as the headline. Close with adjuster ownership of the final call.
 
-This is designed to travel. Tag it with: #insurtech #claimstech #AI #TPAs.
+This is designed to travel. Tag it with: #insurtech #claimstech #claims (use #AI sparingly unless the audience expects it).
 
 ### Day 12 — Send follow-ups to Week 1 outreach
 
@@ -161,7 +166,7 @@ Write a post-call debrief template to fill in after every call: contact info, co
 
 Write and publish a 500–700 word LinkedIn article. Working title: **"The quiet problem with AI liability scoring: it can cite a statute that doesn't exist."**
 
-Body: Explain how generative AI hallucinates citations. Explain how the alternative — a jurisdiction-specific statute database with deterministic matching from controlled vocabulary tags — prevents this. Close with the implication for litigation: *"If your AI cited a statute in the claim file and defense counsel pulls it up and finds it doesn't exist, you have a bigger problem than leakage."*
+Body: Explain the **bad citation** risk in generative outputs (plain English—no need to say “hallucination” in the title). Explain the defense: **ground statute references in your jurisdiction’s real code set** and controlled tagging—not a free-form quote from the model. Close with the litigation point: *"If the file cites authority that doesn’t hold up, the problem isn’t just leakage—it’s credibility."*
 
 ### Day 19 — Send third 10 outreach messages
 
@@ -193,14 +198,14 @@ The pilot proposal is a 2-page document (not a deck):
 **Page 1:**
 - What we're proposing: a 60-day shadow audit pilot covering [X] claims per month
 - What the client does: upload evidence as normal; adjusters continue their existing workflow
-- What Axiom does: analyze every uploaded claim, produce a liability scorecard per item, track AI-vs-adjuster delta automatically
-- What the client gets at the end: a shadow audit report showing agreement rate, average delta, jurisdiction breakdown, and financial opportunity estimate
+- What Axiom does: analyze every uploaded claim in scope, produce a **structured evidence read** per item (timeline, narrative, liability signals where supported), and document **system output vs examiner determination** where your workflow allows
+- What the client gets at the end: a pilot readout—agreement / **review-required** rate, handling-time or quality metrics you agreed up front, and a path to production (avoid promising **financial opportunity** unless you have severity and limits data)
 
 **Page 2:**
 - Pilot fee: [X] flat for 60 days, covering up to [Y] claims
-- Success criteria (agreed in advance): what agreement rate would constitute a successful pilot?
+- Success criteria (agreed in advance): e.g. time to first structured read, examiner alignment on a rubric, or **review-required** usefulness—not a vague “accuracy %” unless you define it
 - Path to production: what does the full deployment look like after the pilot?
-- Data terms: org-scoped, encrypted, no data used for training without consent, deletion on request
+- Data terms: org-scoped, encrypted, **no use of their claims data to improve the service without written consent**, deletion on request
 
 Customize the claim volume and fee for each prospect based on their book size.
 
@@ -228,9 +233,9 @@ Register or submit a speaker proposal for at least one. Conference networking ge
 ### Day 26 — Build a simple public-facing website or landing page
 
 If the product URL is not yet public-facing, build a single landing page:
-- Headline: *"A liability score on every claim. In minutes."*
-- Subhead: *"Three AI models. One statute-cited scorecard. Human adjuster makes the final call."*
-- Four capability bullets (video analysis, multi-model consensus, statute alignment, leakage monitoring)
+- Headline: *"A structured evidence read on the file—in minutes."*
+- Subhead: *"Timeline, narrative, statute-aware context—and a clear **review required** signal when the file doesn’t support a definitive automated call. Examiner makes the final determination."*
+- Four capability bullets (video + documents, structured first read, **certainty vs review required**, statute-aware context, export for QA / shadow workflows)—drop “leakage monitoring” from the landing page unless the product truly has economic inputs
 - One CTA: *"Request a pilot walkthrough"* → email capture or Calendly link
 - No pricing. No blog. Just enough to pass the credibility check when a prospect Googles the company name after receiving outreach.
 
@@ -240,7 +245,7 @@ If no pilot client has been onboarded yet, write a "hypothetical walkthrough" po
 
 *"Here's what Axiom's output looks like on a dashcam clip of a left-turn disputed liability claim."*
 
-Walk through the scorecard: timeline events, statute match, three-model confidence levels, one model flagged for scene coherence drift, liability score withheld pending adjuster review. Use a real clip from a public source (YouTube dashcam footage clearly labeled as such) or a test clip. Be transparent that it's a demo, not a client claim.
+Walk through the output: timeline events, statute context, **review required** (or withheld liability read) when appropriate, and examiner override. Use a public test clip (e.g. YouTube dashcam, clearly labeled) or sanitized demo data. Be transparent that it's a demo, not a client claim.
 
 This is product evidence. It shows the work without needing a live case study.
 

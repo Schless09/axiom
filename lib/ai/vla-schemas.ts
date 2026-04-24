@@ -53,6 +53,27 @@ export const materialFactsSchema = z.object({
    * to another road user encroaching on the insured's path.
    */
   conflict_or_contact: materialFactTernary,
+  /**
+   * Was the insured vehicle (the one whose camera recorded the clip, or the identified claimant
+   * vehicle for witness/adverse footage) stationary or in motion for the majority of this clip?
+   * "uncertain" when the clip is too short or ambiguous to determine.
+   */
+  vehicle_motion: z.enum(["stationary", "moving", "uncertain"]).optional(),
+  /**
+   * For witness or adverse footage: can the insured (policyholder) vehicle be positively
+   * identified from the visual evidence? Always "yes" for insured-dashcam footage.
+   * "uncertain" when the vehicle is present but not definitively identified.
+   */
+  insured_identifiable: materialFactTernary.optional(),
+  /**
+   * Is a regulatory turn-restriction sign (U-turn, left/right turn prohibition, no-turn-on-red,
+   * or equivalent) clearly visible and legible in any frame? "not_visible" when no such sign
+   * is present or readable. null when turn signs are wholly irrelevant to this clip.
+   */
+  turn_restriction: z
+    .enum(["prohibited", "permitted", "not_visible", "uncertain"])
+    .nullable()
+    .optional(),
 });
 
 function nullToUndef<T>(v: T | null | undefined): T | undefined {
@@ -116,17 +137,17 @@ export function parseVlaJson(raw: string): VlaAnalysis {
 
 export const partySchema = z.object({
   role: z.enum(["insured", "adverse", "witness", "officer", "other"]),
-  name: z.string().optional(),
-  vehicle: z.string().optional(),
-  injuries_reported: z.boolean().optional(),
-  statement_summary: z.string().optional(),
+  name: z.preprocess(nullToUndef, z.string().optional()),
+  vehicle: z.preprocess(nullToUndef, z.string().optional()),
+  injuries_reported: z.preprocess(nullToUndef, z.boolean().optional()),
+  statement_summary: z.preprocess(nullToUndef, z.string().optional()),
 });
 
 export const citedViolationSchema = z.object({
   party_role: z.enum(["insured", "adverse", "witness", "other"]),
   violation_description: z.string(),
-  statute_reference: z.string().optional(),
-  violation_tag: z.string().optional(),
+  statute_reference: z.preprocess(nullToUndef, z.string().optional()),
+  violation_tag: z.preprocess(nullToUndef, z.string().optional()),
 });
 
 export const policyEvidenceSchema = z.object({
@@ -138,14 +159,14 @@ export const policyEvidenceSchema = z.object({
     "medical_record",
     "other",
   ]),
-  incident_date: z.string().optional(),
-  incident_location: z.string().optional(),
+  incident_date: z.preprocess(nullToUndef, z.string().optional()),
+  incident_location: z.preprocess(nullToUndef, z.string().optional()),
   parties: z.array(partySchema).default([]),
   violations_cited: z.array(citedViolationSchema).default([]),
-  officer_narrative: z.string().optional(),
-  fault_determination: z.string().optional(),
-  insured_liability_percent: z.number().min(0).max(100).optional(),
-  repair_total_usd: z.number().optional(),
+  officer_narrative: z.preprocess(nullToUndef, z.string().optional()),
+  fault_determination: z.preprocess(nullToUndef, z.string().optional()),
+  insured_liability_percent: z.preprocess(nullToUndef, z.number().min(0).max(100).optional()),
+  repair_total_usd: z.preprocess(nullToUndef, z.number().optional()),
   summary: z.string(),
   confidence: z.enum(["high", "medium", "low"]).default("medium"),
 });

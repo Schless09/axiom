@@ -111,6 +111,23 @@ function defaultClaimNumber(): string {
   return `CLM-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
 }
 
+/** Keeps the real PostgREST/Postgres message first; adds a short hint for common PDF cases. */
+function formatPdfEvidenceInsertError(raw: string): string {
+  if (/row-level security/i.test(raw)) {
+    return `${raw}\n\nRLS blocked this row: you must be logged in as the claim owner (claim.user_id = your user) with org membership.`;
+  }
+  if ((/file_type|document/i.test(raw) || /evidence_file_type/i.test(raw)) && (/check constraint|not-null/i.test(raw))) {
+    return `${raw}\n\nfile_type: pull the latest supabase_migration_evidence_file_type_document.sql and run it again — it drops every evidence CHECK whose definition mentions file_type, then re-adds one that allows \`document\`.`;
+  }
+  if (/evidence_source_type_check|source_type/i.test(raw) && /check constraint/i.test(raw)) {
+    return `${raw}\n\nsource_type: run supabase_migration_evidence_source_type_check.sql (full allow-list includes \`other\`). The app now sends \`police_report\` for PDF batch uploads so this usually passes without SQL.`;
+  }
+  if (/violates check constraint/i.test(raw)) {
+    return `${raw}\n\nList evidence checks in Supabase SQL: select conname, pg_get_constraintdef(oid) from pg_constraint where conrelid = 'public.evidence'::regclass and contype = 'c';`;
+  }
+  return raw;
+}
+
 export type UploadClaimResult =
   | { ok: true; claimId: string; evidenceId: string; batchId: string | null }
   | { ok: false; error: string };
@@ -176,25 +193,27 @@ export async function uploadClaimEvidence(formData: FormData): Promise<UploadCla
         mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm",
         mkv: "video/x-matroska", avi: "video/x-msvideo",
         jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+        pdf: "application/pdf",
       };
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
       const mime = (file.type && file.type !== "application/octet-stream")
         ? file.type
         : EXT_MIME[ext] ?? "video/mp4";
-      const file_type = mime.startsWith("video/") ? "video" : mime.startsWith("image/") ? "image" : "video";
+      const isPdf = mime === "application/pdf" || ext === "pdf";
+      // PDFs: use explicit 'document' so NOT NULL columns and the analyze route agree. If insert fails with a
+      // check constraint, run supabase_migration_evidence_file_type_document.sql in Supabase.
+      const effective_file_type: string | null = mime.startsWith("image/")
+        ? "image"
+        : isPdf
+          ? "document"
+          : "video";
 
-      // Evidence source metadata — accept explicit values or derive smart defaults.
-      const VALID_SOURCE_TYPES = [
-        "dashcam_video", "surveillance_video", "bystander_video", "telematics_video",
-        "police_report", "recorded_statement", "witness_statement", "scene_diagram",
-        "damage_photo", "repair_estimate", "medical_record", "other",
-      ] as const;
-      type SourceType = typeof VALID_SOURCE_TYPES[number];
-      const sourceTypeRaw = formData.get("source_type");
-      const source_type: SourceType =
-        typeof sourceTypeRaw === "string" && (VALID_SOURCE_TYPES as readonly string[]).includes(sourceTypeRaw)
-          ? (sourceTypeRaw as SourceType)
-          : file_type === "image" ? "damage_photo" : "dashcam_video";
+      // Derive source_type from MIME — the AI classifier will refine this during analysis.
+      // PDFs use police_report (not "other") so older DBs whose source_type CHECK omits "other" still accept inserts.
+      const source_type =
+        effective_file_type === "image" ? "damage_photo" :
+        isPdf ? "police_report" :
+        "dashcam_video";
 
       const VALID_SUBMITTED_BY = ["insured", "adjuster", "attorney", "tpa", "thirdparty", "system"] as const;
       const submittedByRaw = formData.get("submitted_by");
@@ -215,31 +234,65 @@ export async function uploadClaimEvidence(formData: FormData): Promise<UploadCla
           ? batchIdRaw.trim()
           : null;
 
-      const { data: claim, error: claimError } = await supabase
-        .from("claims")
-        .insert({
-          org_id: orgId,
-          user_id: user.id,
-          claim_number,
-          state_code,
-          status: "pending",
-          dashcam_perspective: "insured",
-          ...(batch_id ? { batch_id } : {}),
-        })
-        .select("id")
-        .single();
+      // Optional perspective per evidence item (used when grouping multiple files into one claim)
+      const VALID_PERSPECTIVES = ["insured", "adverse", "witness", "officer", "neutral"] as const;
+      const perspectiveRaw = formData.get("perspective");
+      const evidence_perspective =
+        typeof perspectiveRaw === "string" && (VALID_PERSPECTIVES as readonly string[]).includes(perspectiveRaw)
+          ? perspectiveRaw
+          : null;
 
-      if (claimError || !claim) {
-        if (claimError?.code === "23505") {
-          return {
-            ok: false,
-            error: "That claim number is already in use. Leave it blank for an auto-generated number.",
-          };
+      // Optional: add evidence to an existing claim instead of creating a new one.
+      // Used when grouping multiple files under one claim from the batch upload form.
+      const existingClaimIdRaw = formData.get("claim_id");
+      const existingClaimId =
+        typeof existingClaimIdRaw === "string" && existingClaimIdRaw.trim().length > 0
+          ? existingClaimIdRaw.trim()
+          : null;
+
+      let claimId: string;
+
+      if (existingClaimId) {
+        // Verify the user owns this claim before attaching evidence to it
+        const { data: existingClaim, error: fetchError } = await supabase
+          .from("claims")
+          .select("id")
+          .eq("id", existingClaimId)
+          .eq("org_id", orgId)
+          .eq("user_id", user.id)
+          .single();
+
+        if (fetchError || !existingClaim) {
+          return { ok: false, error: "Claim not found or access denied." };
         }
-        return { ok: false, error: claimError?.message ?? "Failed to create claim." };
+        claimId = existingClaim.id as string;
+      } else {
+        const { data: claim, error: claimError } = await supabase
+          .from("claims")
+          .insert({
+            org_id: orgId,
+            user_id: user.id,
+            claim_number,
+            state_code,
+            status: "pending",
+            dashcam_perspective: "insured",
+            ...(batch_id ? { batch_id } : {}),
+          })
+          .select("id")
+          .single();
+
+        if (claimError || !claim) {
+          if (claimError?.code === "23505") {
+            return {
+              ok: false,
+              error: "That claim number is already in use. Leave it blank for an auto-generated number.",
+            };
+          }
+          return { ok: false, error: claimError?.message ?? "Failed to create claim." };
+        }
+        claimId = claim.id as string;
       }
 
-      const claimId = claim.id as string;
       const objectName = `${orgId}/${user.id}/${claimId}/${safeFileName(file.name)}`;
 
       const buffer = Buffer.from(await file.arrayBuffer());
@@ -249,7 +302,9 @@ export async function uploadClaimEvidence(formData: FormData): Promise<UploadCla
       });
 
       if (uploadError) {
-        await supabase.from("claims").delete().eq("id", claimId).eq("org_id", orgId);
+        if (!existingClaimId) {
+          await supabase.from("claims").delete().eq("id", claimId).eq("org_id", orgId);
+        }
         return { ok: false, error: uploadError.message };
       }
 
@@ -259,20 +314,24 @@ export async function uploadClaimEvidence(formData: FormData): Promise<UploadCla
           org_id: orgId,
           claim_id: claimId,
           file_path: objectName,
-          file_type,
+          file_type: effective_file_type,
           source_type,
           submitted_by,
           original_filename: file.name,
           file_size_bytes: file.size,
           ...(captured_at ? { captured_at } : {}),
+          ...(evidence_perspective ? { perspective: evidence_perspective } : {}),
         })
         .select("id")
         .single();
 
       if (evError || !ev) {
         await supabase.storage.from(BUCKET).remove([objectName]);
-        await supabase.from("claims").delete().eq("id", claimId).eq("org_id", orgId);
-        return { ok: false, error: evError?.message ?? "Failed to save evidence record." };
+        if (!existingClaimId) {
+          await supabase.from("claims").delete().eq("id", claimId).eq("org_id", orgId);
+        }
+        const raw = evError?.message ?? "Failed to save evidence record.";
+        return { ok: false, error: isPdf ? formatPdfEvidenceInsertError(raw) : raw };
       }
 
       revalidatePath("/dashboard/claims");
@@ -349,15 +408,24 @@ export async function addEvidenceToExistingClaim(
       ? file.type
       : EXT_MIME_ADD[ext] ?? "application/octet-stream";
 
-  const file_type = mime.startsWith("video/") ? "video" : mime.startsWith("image/") ? "image" : "document";
+  const isPdf =
+    mime === "application/pdf" || ext === "pdf" || mime.toLowerCase().includes("pdf");
+  const file_type_db: string | null =
+    mime.startsWith("video/")
+      ? "video"
+      : mime.startsWith("image/")
+        ? "image"
+        : isPdf
+          ? "document"
+          : null;
 
   const sourceTypeRaw = formData.get("source_type");
   const source_type: AddSourceType =
     typeof sourceTypeRaw === "string" && (VALID_SOURCE_TYPES_ADD as readonly string[]).includes(sourceTypeRaw)
       ? (sourceTypeRaw as AddSourceType)
-      : file_type === "image" ? "damage_photo"
-      : file_type === "video" ? "dashcam_video"
-      : mime.includes("pdf") ? "police_report"
+      : mime.startsWith("image/") ? "damage_photo"
+      : mime.startsWith("video/") ? "dashcam_video"
+      : isPdf ? "police_report"
       : mime.startsWith("audio/") ? "recorded_statement"
       : "other";
 
@@ -395,7 +463,7 @@ export async function addEvidenceToExistingClaim(
       org_id: orgId,
       claim_id: claimId,
       file_path: objectName,
-      file_type,
+      file_type: file_type_db,
       source_type,
       submitted_by,
       original_filename: file.name,
@@ -409,7 +477,8 @@ export async function addEvidenceToExistingClaim(
 
   if (evError || !ev) {
     await supabase.storage.from(BUCKET).remove([objectName]);
-    return { ok: false, error: evError?.message ?? "Failed to save evidence record." };
+    const raw = evError?.message ?? "Failed to save evidence record.";
+    return { ok: false, error: isPdf ? formatPdfEvidenceInsertError(raw) : raw };
   }
 
   // Reset claim to pending so AnalysisTrigger fires re-analysis

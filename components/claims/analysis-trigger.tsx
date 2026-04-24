@@ -2,6 +2,9 @@
 
 import { useEffect, useRef } from "react";
 
+/** Dedupes overlapping POSTs (e.g. React Strict Mode remount, batch page + scorecard open). Server also uses pending→analyzing row lock. */
+const analyzeInFlight = new Set<string>();
+
 type Props = { claimId: string; status: string };
 
 /**
@@ -29,6 +32,8 @@ export function AnalysisTrigger({ claimId, status }: Props) {
 
     async function fire() {
       if (cancelled) return;
+      if (analyzeInFlight.has(claimId)) return;
+      analyzeInFlight.add(claimId);
       attemptRef.current += 1;
 
       try {
@@ -47,6 +52,8 @@ export function AnalysisTrigger({ claimId, status }: Props) {
         // All other responses (2xx, 409, 5xx) → stop; polling handles status update
       } catch {
         // Network error — polling will show the current status
+      } finally {
+        analyzeInFlight.delete(claimId);
       }
     }
 

@@ -10,7 +10,7 @@ export type DashcamPerspective = "insured" | "witness" | "adverse";
  * meaningful way. Stored in evidence_analysis rows so you can diff model
  * behavior across prompt versions in regression testing.
  */
-export const PROMPT_VERSION = "v5";
+export const PROMPT_VERSION = "v8";
 
 const PERSPECTIVE_INSTRUCTIONS: Record<"insured" | "witness" | "adverse", string> = {
   insured:
@@ -21,10 +21,10 @@ const PERSPECTIVE_INSTRUCTIONS: Record<"insured" | "witness" | "adverse", string
 
   witness:
     "PERSPECTIVE — always fixed: The dashcam belongs to a WITNESS or BYSTANDER vehicle that is NOT a party to this claim. " +
-    "The insured vehicle is one of the vehicles visible in the footage. " +
-    "Identify which vehicle appears to be the claimant's vehicle based on the incident context (e.g. the vehicle that was struck, or the vehicle whose actions are being disputed). " +
-    "Every liability percentage refers exclusively to fault attributable to that INSURED VEHICLE. " +
-    "State your identification of the insured vehicle explicitly in your first adjuster_observation. " +
+    "The insured (policyholder) vehicle may or may not be visible; you must NOT guess which distant vehicle is the insured unless the claim context (file name hint, police narrative, or explicit description) ties a specific vehicle to the policyholder. " +
+    "If you cannot tie a vehicle to the insured, say so plainly in narrative and timeline: describe what is visible (e.g. 'white sedan in left lane') without calling it 'the insured vehicle,' and score liability only if the claim context identifies the insured and you can observe that vehicle's conduct. " +
+    "When the insured is not identifiable, recommended_liability_percent should be 0 with overall_confidence lowered to medium or low and material_facts unchanged from what the pixels support. " +
+    "Every liability percentage still refers exclusively to fault attributable to the INSURED VEHICLE once that vehicle is identified; never attribute the witness/camera car's maneuvers to the insured. " +
     "A score of 0 means the insured bears no fault; 100 means the insured bears full fault.",
 
   adverse:
@@ -58,6 +58,8 @@ export function buildSequentialFramePreamble(frameCount: number): string {
   return (
     `You are analyzing ${frameCount} sequential frames extracted chronologically from a dashcam video recording. ` +
     `Frame 1 is earliest, frame ${frameCount} is latest. Treat this as one continuous clip — reason about motion and timing across ALL frames before concluding. ` +
+    `Frames are a sparse sample: wall time between Frame 1 and Frame ${frameCount} can be many seconds even when motion looks small between adjacent frames — do not treat the sample as proof the whole file is only a fraction of a second, and do not equate "20 frames" with sub-second duration unless the imagery clearly shows that. ` +
+    `evidence_span should reflect your best estimate of real time in the source file for the behavior you describe (often closer to full clip length for steady-state driving), not an invented tiny interval. ` +
     `Do not invent vehicles, collisions, or maneuvers that never appear in any frame. If the clip is ambiguous, say so with "uncertain" in material_facts and lower per-event confidence.\n\n`
   );
 }
@@ -66,7 +68,10 @@ export const USER_PROMPT = `Analyze the attached evidence and respond with a sin
 {
   "material_facts": {
     "another_vehicle_present": "yes" | "no" | "uncertain",
-    "conflict_or_contact": "yes" | "no" | "uncertain"
+    "conflict_or_contact": "yes" | "no" | "uncertain",
+    "vehicle_motion": "stationary" | "moving" | "uncertain",
+    "insured_identifiable": "yes" | "no" | "uncertain",
+    "turn_restriction": "prohibited" | "permitted" | "not_visible" | "uncertain" | null
   },
   "timeline": [
     {
@@ -87,11 +92,16 @@ export const USER_PROMPT = `Analyze the attached evidence and respond with a sin
 }
 
 Field rules:
-- material_facts: answer from the evidence only. "another_vehicle_present" = yes if another moving road user’s vehicle is clearly visible such that it could interact with the insured in this clip (not merely distant parked cars). "conflict_or_contact" = yes if you see contact, a collision, a clearly imminent crash, or the insured braking/steering hard because another road user has entered their path. If lighting, angle, or frame gaps prevent a firm answer, use "uncertain" for that field — never guess "no" when you cannot see the relevant moment.
+- material_facts: answer every field from the evidence only — never infer what is not visible.
+  • another_vehicle_present: “yes” if another moving road user’s vehicle is clearly visible and could interact with the insured in this clip (not merely distant parked cars).
+  • conflict_or_contact: “yes” if you see contact, a collision, a clearly imminent crash, or the insured braking/steering hard because another road user has entered their path. If lighting, angle, or frame gaps prevent a firm answer, use “uncertain” — never guess “no” when you cannot see the relevant moment.
+  • vehicle_motion: “stationary” if the insured vehicle is stopped (at a light, in queued traffic, parked, etc.) for the majority of the clip; “moving” if clearly traveling; “uncertain” if the clip is too short or ambiguous to determine.
+  • insured_identifiable: “yes” for insured-dashcam footage (always). For witness or adverse footage: “yes” only if you can positively tie a specific vehicle to the policyholder from the visual evidence; “no” if the insured vehicle cannot be identified; “uncertain” if it may be present but is not definitively confirmed.
+  • turn_restriction: set to null if no turn maneuver is relevant to this clip. If a regulatory turn-restriction sign (U-turn prohibition, no-left-turn, no-right-on-red, or equivalent) is clearly legible in any frame, use “prohibited”. If a sign explicitly permits the maneuver (e.g. “U-turn permitted”), use “permitted”. Use “not_visible” if a turn maneuver is relevant but no legible sign appears. Use “uncertain” if a sign is partially visible but unreadable.
 - timeline: chronological order. "action" = short neutral label describing what occurred (e.g. "insured follows too close", "third-party lane change"). Always identify which vehicle is acting — insured or third party.
 - timestamp_seconds: approximate time in the source recording (seconds from clip start) for the key moment of this event — align with evidence_span when both are present.
 - frame_index: REQUIRED when you received multiple sequential frames from a video. Integer ≥1 where Frame 1 is the earliest image shown; pick the single frame that best shows this event. Omit the key entirely for a single still photograph (not a frame sequence).
-- evidence_span: REQUIRED when analyzing video. {start_seconds, end_seconds} = wall-clock interval in the source clip where this event is visible or inferable (end_seconds may equal start_seconds; end_seconds must be ≥ start_seconds). Omit the key entirely for a single still photograph.
+- evidence_span: REQUIRED when analyzing video. {start_seconds, end_seconds} = wall-clock interval in the **full source recording** where this event is visible or inferable (not the gap between two JPEG samples unless that truly is the whole clip). end_seconds may equal start_seconds; end_seconds must be ≥ start_seconds. If duration is uncertain because of sparse sampling, widen the span conservatively and lower confidence. Omit the key entirely for a single still photograph.
 - suggested_liability_percent (per event): 0–100 fault attributable TO THE INSURED VEHICLE at that moment. Use 0 unless the insured committed a specific, observable traffic violation or driving error at that moment. Do NOT assign partial fault based on "could have reacted sooner," "might have been going slightly fast," or other hypothetical alternatives — only score what you can directly observe. If a third party commits a violation that does not implicate the insured, score 0.
 - adjuster_observation: 1–3 sentences, professional file-note tone. Explicitly name which vehicle is acting and what it did. Note uncertainty if lighting/angle limits certainty.
 - violation_tags: tags for violations committed BY THE INSURED VEHICLE only — not third parties. Use only: ["speeding", "lane_change", "failure_to_yield", "improper_turn", "following_too_close", "running_red_light", "running_stop_sign", "distracted_driving", "reckless_driving"]. Empty array if the insured committed no violation in this event.

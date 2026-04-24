@@ -47,7 +47,7 @@ export default async function BatchStatusPage({ params }: PageProps) {
   const orgId = await getOrgIdForUser(supabase, user.id);
   if (!orgId) notFound();
 
-  const { data: claims, error } = await supabase
+  const { data: claims, error: claimsError } = await supabase
     .from("claims")
     .select("id, claim_number, state_code, status, liability_score, created_at")
     .eq("org_id", orgId)
@@ -55,7 +55,40 @@ export default async function BatchStatusPage({ params }: PageProps) {
     .eq("batch_id", batchId)
     .order("created_at", { ascending: true });
 
-  if (error || !claims || claims.length === 0) notFound();
+  if (claimsError) {
+    return (
+      <div className="mx-auto max-w-3xl p-8">
+        <h1 className="text-xl font-semibold">Batch analysis</h1>
+        <p className="mt-2 text-sm text-destructive">Could not load this batch: {claimsError.message}</p>
+        <Link href="/dashboard/new" className={cn(buttonVariants(), "mt-4 inline-flex")}>
+          Back to upload
+        </Link>
+      </div>
+    );
+  }
+
+  if (!claims || claims.length === 0) {
+    return (
+      <div className="mx-auto max-w-3xl p-8">
+        <h1 className="text-xl font-semibold">Batch analysis</h1>
+        <p className="mt-2 text-sm text-muted-foreground font-mono">{batchId}</p>
+        <p className="mt-4 text-sm text-muted-foreground">
+          No claims are linked to this batch. That usually means every upload failed (check errors on the upload
+          screen), the batch ID is wrong, or the <code className="rounded bg-muted px-1 py-0.5 text-xs">batch_id</code>{" "}
+          column is missing on claims—run{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">supabase_migration_batch_id.sql</code> in Supabase.
+        </p>
+        <div className="mt-6 flex gap-2">
+          <Link href="/dashboard/new" className={cn(buttonVariants())}>
+            Upload again
+          </Link>
+          <Link href="/dashboard/claims" className={cn(buttonVariants({ variant: "outline" }))}>
+            All claims
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const total = claims.length;
   const completed = claims.filter((c) => c.status === "completed").length;
@@ -97,8 +130,7 @@ export default async function BatchStatusPage({ params }: PageProps) {
           <p className="mt-1 text-sm text-muted-foreground font-mono">{batchId}</p>
           {!allDone && (
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-              Claims are processed by an automated pipeline: ingest, classification, multi-model review,
-              consensus, and statute checks—then results land on each scorecard.
+              Each claim is reviewed automatically. Open the scorecard when the status shows Done.
             </p>
           )}
         </div>
